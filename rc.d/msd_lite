@@ -1,0 +1,41 @@
+#!/bin/sh
+### Rozhuk Ivan 2011.06 - 2014
+### startup script file for msd_lite
+###
+
+
+# PROVIDE: msd_lite
+# REQUIRE: DAEMON
+# BEFORE:  LOGIN
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name="msd_lite"
+rcvar=`set_rcvar`
+
+load_rc_config $name
+
+: ${msd_lite_enable="NO"}
+: ${msd_lite_cfgfile="/root/msd_lite/src/msd_lite.conf"}
+: ${msd_lite_pidfile="/var/run/msd_lite.pid"}
+: ${msd_lite_user="www"}
+: ${msd_lite_group="www"}
+: ${msd_lite_chroot=""}
+: ${msd_lite_chdir=""}
+
+
+
+command="/root/msd_lite/src/msd_lite"
+command_args="-d -c ${msd_lite_cfgfile} -P ${msd_lite_pidfile}&"
+
+pidfile="${msd_lite_chroot}${msd_lite_pidfile}"
+required_dirs=${msd_lite_chroot}
+required_files="${msd_lite_chroot}${command}"
+
+
+
+
+
+
+run_rc_command "$1"
