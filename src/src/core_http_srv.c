@@ -1687,6 +1687,13 @@ http_srv_gen_resp_hdrs(uint32_t http_ver, uint32_t status_code,
 
 	if (NULL == buf || 0 == buf_size)
 		return (EINVAL);
+	if (NULL != reason_phrase && 0 != reason_phrase_size) {
+		/* Remove CRLF from tail. */
+		while (0 < reason_phrase_size &&
+		    ('\r' == reason_phrase[(reason_phrase_size - 1)] ||
+		    '\n' == reason_phrase[(reason_phrase_size - 1)]))
+			reason_phrase_size --;
+	}
 	if (NULL == reason_phrase || 0 == reason_phrase_size)
 		reason_phrase = http_get_err_descr(status_code, &reason_phrase_size);
 	if (NULL == http_server || 0 == http_server_size)
@@ -1696,7 +1703,7 @@ http_srv_gen_resp_hdrs(uint32_t http_ver, uint32_t status_code,
 	    ((0 != (HTTP_SRV_RESP_P_F_CONTENT_SIZE & resp_p_flags)) ? 32 : 0) +
 	    ((0 != (HTTP_SRV_RESP_P_F_CONN_CLOSE & resp_p_flags)) ? 19 : 0)))
 		return (ENOMEM); /* Not enough space in buf. */
-	buf_size --;
+	buf_size --; /* Keep last byte for zero. */
 	/* HTTP header. */
 	if (HTTP_VER_1_1 == http_ver) { /* HTTP/1.1 client. */
 		memcpy(buf, "HTTP/1.1 ", 9);
@@ -1708,19 +1715,23 @@ http_srv_gen_resp_hdrs(uint32_t http_ver, uint32_t status_code,
 	    "%"PRIu32" ", status_code);
 	memcpy((buf + hdrs_size), reason_phrase, reason_phrase_size);
 	hdrs_size += reason_phrase_size;
+	memcpy((buf + hdrs_size), "\r\n", 2);
+	hdrs_size += 2;
 	
 	if (0 != (resp_p_flags & HTTP_SRV_RESP_P_F_SERVER)) {
-		memcpy((buf + hdrs_size), "\r\nServer: ", 10);
-		hdrs_size += 10;
+		memcpy((buf + hdrs_size), "Server: ", 8);
+		hdrs_size += 8;
 		memcpy((buf + hdrs_size), http_server, http_server_size);
 		hdrs_size += http_server_size;
+		memcpy((buf + hdrs_size), "\r\n", 2);
+		hdrs_size += 2;
 	}
 	if (0 != (resp_p_flags & HTTP_SRV_RESP_P_F_CONTENT_SIZE)) {
 		hdrs_size += snprintf((buf + hdrs_size), (buf_size - hdrs_size),
-		    "\r\nContent-Size: %"PRIu64, content_size);
+		    "Content-Size: %"PRIu64"\r\n", content_size);
 	}
 	if (0 != (HTTP_SRV_RESP_P_F_CONN_CLOSE & resp_p_flags)) { /* Conn close. */
-		memcpy((buf + hdrs_size), "\r\nConnection: close", 19);
+		memcpy((buf + hdrs_size), "Connection: close\r\n", 19);
 		hdrs_size += 19;
 	}
 	buf[hdrs_size] = 0;
@@ -1738,7 +1749,7 @@ http_srv_snd(http_srv_cli_p cli, uint32_t status_code,
 	int error;
 	http_srv_p srv;
 	uint8_t	*wr_pos;
-	char hdrs[1024];
+	char hdrs[1024], *crlf = (char*)"\r\n";
 	size_t hdrs_size, data_size, i;
 	ssize_t ios = 0;
 	struct iovec iov[IOV_MAX];
@@ -1783,17 +1794,23 @@ http_srv_snd(http_srv_cli_p cli, uint32_t status_code,
 	iov[0].iov_base = hdrs;
 	iov[0].iov_len = hdrs_size;
 	for (i = 0; i < custom_hdrs_count; i ++) { /* Add custom headers. */
-		if (NULL == custom_hdrs[i].iov_base || 0 == custom_hdrs[i].iov_len)
+		if (NULL == custom_hdrs[i].iov_base || 3 > custom_hdrs[i].iov_len)
 			continue; /* Skeep empty header part. */
-		iov[mhdr.msg_iovlen].iov_base = (void*)"\r\n";
+		iov[mhdr.msg_iovlen].iov_base = custom_hdrs[i].iov_base;
+		iov[mhdr.msg_iovlen].iov_len = custom_hdrs[i].iov_len;
+		mhdr.msg_iovlen ++;
+		hdrs_size += custom_hdrs[i].iov_len;
+		if (0 == memcmp((((uint8_t*)custom_hdrs[i].iov_base) +
+		    (custom_hdrs[i].iov_len - 2)), crlf, 2))
+			continue; /* No need to add tailing CRLF. */
+		iov[mhdr.msg_iovlen].iov_base = (void*)crlf;
 		iov[mhdr.msg_iovlen].iov_len = 2;
-		memcpy(&iov[(1 + mhdr.msg_iovlen)], &custom_hdrs[i], sizeof(struct iovec));
-		mhdr.msg_iovlen += 2;
-		hdrs_size += (2 + custom_hdrs[i].iov_len); /* Hdr size + CRLF count */
+		mhdr.msg_iovlen ++;
+		hdrs_size += 2;
 	}
-	iov[mhdr.msg_iovlen].iov_base = (void*)"\r\n\r\n";
-	iov[mhdr.msg_iovlen].iov_len = 4;
-	hdrs_size += 4;
+	iov[mhdr.msg_iovlen].iov_base = (void*)crlf;
+	iov[mhdr.msg_iovlen].iov_len = 2;
+	hdrs_size += 2;
 	iov[(1 + mhdr.msg_iovlen)].iov_base = IO_BUF_OFFSET_GET(cli->buf);
 	iov[(1 + mhdr.msg_iovlen)].iov_len = data_size;
 	mhdr.msg_iovlen += 2;

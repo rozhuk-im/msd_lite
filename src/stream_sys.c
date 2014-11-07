@@ -206,19 +206,23 @@ str_hubs_bckt_create(thrp_p thrp, const char *app_ver, str_hub_params_p hub_para
 	/* Copy custom HTTP headers to new buffer. */
 	shbskt->hub_params.cust_http_hdrs = (uint8_t*)(shbskt + 1);
 	if (NULL != hub_params->cust_http_hdrs &&
-	    0 == hub_params->cust_http_hdrs_size) {
-		/* Add start CRLF. */
-		memcpy(shbskt->hub_params.cust_http_hdrs, "\r\n", 2);
+	    0 != hub_params->cust_http_hdrs_size) {
 		/* Custom headers body. */
-		memcpy((shbskt->hub_params.cust_http_hdrs + 2),
+		memcpy(shbskt->hub_params.cust_http_hdrs,
 		    hub_params->cust_http_hdrs,
 		    hub_params->cust_http_hdrs_size);
-		shbskt->hub_params.cust_http_hdrs_size = (hub_params->cust_http_hdrs_size + 2);
+		if (0 != memcmp((shbskt->hub_params.cust_http_hdrs +
+		    (shbskt->hub_params.cust_http_hdrs_size - 2)), "\r\n", 2)) {
+			/* Add CRLF. */
+			memcpy((shbskt->hub_params.cust_http_hdrs +
+			    shbskt->hub_params.cust_http_hdrs_size), "\r\n", 2);
+			shbskt->hub_params.cust_http_hdrs_size += 2;
+		}
 	}
-	/* Add final CRLFCRLF. */
-	memcpy((shbskt->hub_params.cust_http_hdrs + shbskt->hub_params.cust_http_hdrs_size),
-	    "\r\n\r\n", 5);
-	shbskt->hub_params.cust_http_hdrs_size += 4;
+	/* Add final CRLF + zero. */
+	memcpy((shbskt->hub_params.cust_http_hdrs +
+	    shbskt->hub_params.cust_http_hdrs_size), "\r\n", 3);
+	shbskt->hub_params.cust_http_hdrs_size += 2;
 	/* sec->ms, kb -> bytes */
 	hub_params = &shbskt->hub_params; /* Use short name. */
 	hub_params->ring_buf_size *= 1024;
@@ -244,7 +248,7 @@ str_hubs_bckt_create(thrp_p thrp, const char *app_ver, str_hub_params_p hub_para
 	    sizeof(shbskt->base_http_hdrs),
 	    "HTTP/1.1 200 OK\r\n"
 	    "Server: %s %s HTTP stream hub by Rozhuk Ivan\r\n"
-	    "Connection: close",
+	    "Connection: close\r\n",
 	    osver, app_ver);
 	/* Timer */
 	shbskt->thrp = thrp;
@@ -557,12 +561,12 @@ str_hub_cli_alloc(uintptr_t skt, const char *ua, size_t ua_size) {
 		return (NULL);
 	/* Set. */
 	strh_cli->skt = skt;
-	if (NULL == ua || 0 == ua_size) /* Empty value. */
-		return (0);
 	strh_cli->user_agent = (uint8_t*)(strh_cli + 1);
-	strh_cli->user_agent_size = ua_size;
-	memcpy(strh_cli->user_agent, ua, ua_size);
-	strh_cli->user_agent[ua_size] = 0;
+	if (NULL != ua && 0 != ua_size) {
+		strh_cli->user_agent_size = ua_size;
+		memcpy(strh_cli->user_agent, ua, ua_size);
+		strh_cli->user_agent[ua_size] = 0;
+	}
 
 	return (strh_cli);
 }
