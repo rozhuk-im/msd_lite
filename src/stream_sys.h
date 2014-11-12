@@ -86,6 +86,7 @@ typedef struct str_hub_params_s {
 	char		cc_name[TCP_CA_NAME_MAX];/* tcp congestion control forced for client. */
 	/* End Client settings and defaults. */
 	size_t		ring_buf_size;	/* Size of ring buf. */
+	uint32_t	precache;
 	uint32_t	snd_block_min_size;
 	uint8_t		*cust_http_hdrs;
 	size_t		cust_http_hdrs_size;
@@ -98,6 +99,7 @@ typedef struct str_hub_params_s {
 /* Default values. */
 #define STR_HUB_P_DEF_FLAGS		(0)
 #define STR_HUB_P_DEF_RING_BUF_SIZE	(1 * 1024) /* kb */
+#define STR_HUB_P_DEF_PRECAHE		(1 * 1024) /* kb */
 #define STR_HUB_P_DEF_SND_BLOCK_MIN_SIZE (64) /* kb */
 #define STR_HUB_P_DEF_SKT_SND_BUF	(256)	/* kb */
 

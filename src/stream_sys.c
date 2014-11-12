@@ -154,6 +154,7 @@ str_hub_params_def(str_hub_params_p p_ret) {
 	memset(p_ret, 0, sizeof(str_hub_params_t));
 	p_ret->flags = STR_HUB_P_DEF_FLAGS;
 	p_ret->ring_buf_size = STR_HUB_P_DEF_RING_BUF_SIZE;
+	p_ret->precache = STR_HUB_P_DEF_PRECAHE;
 	p_ret->snd_block_min_size = STR_HUB_P_DEF_SND_BLOCK_MIN_SIZE;
 	p_ret->skt_snd_buf = STR_HUB_P_DEF_SKT_SND_BUF;
 }
@@ -226,8 +227,14 @@ str_hubs_bckt_create(thrp_p thrp, const char *app_ver, str_hub_params_p hub_para
 	/* sec->ms, kb -> bytes */
 	hub_params = &shbskt->hub_params; /* Use short name. */
 	hub_params->ring_buf_size *= 1024;
+	hub_params->precache *= 1024;
 	hub_params->snd_block_min_size *= 1024;
 	hub_params->skt_snd_buf *= 1024;
+	/* Correct values. */
+	if (hub_params->precache > hub_params->ring_buf_size)
+		hub_params->precache = hub_params->ring_buf_size;
+	if (hub_params->snd_block_min_size > hub_params->skt_snd_buf)
+		hub_params->snd_block_min_size = hub_params->skt_snd_buf;
 
 	/* Stream src Params */
 	memcpy(&shbskt->src_params, src_params, sizeof(str_src_params_t));
@@ -806,7 +813,8 @@ str_hub_send_to_clients(str_hub_p str_hub) {
 		/* Init uninitialized client rpos. */
 		if (0 == (STR_HUB_CLI_F_RPOS_INITIALIZED & strh_cli->flags)) {
 			strh_cli->flags |= STR_HUB_CLI_F_RPOS_INITIALIZED;
-			r_buf_rpos_init(str_hub->r_buf, &strh_cli->rpos, 0);
+			r_buf_rpos_init(str_hub->r_buf, &strh_cli->rpos,
+			    str_hub->shbskt->hub_params.precache);
 		}
 		error = str_hub_send_to_client(str_hub, strh_cli, &transfered_size);
 error_on_send:

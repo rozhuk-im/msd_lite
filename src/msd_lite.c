@@ -232,6 +232,8 @@ msd_hub_profile_load(uint8_t *data, size_t data_size, str_hub_params_p params) {
 	
 	xml_get_val_int_args(data, data_size, NULL, (int32_t*)&params->ring_buf_size,
 	    (const uint8_t*)"ringBufSize", NULL);
+	xml_get_val_int_args(data, data_size, NULL, (int32_t*)&params->precache,
+	    (const uint8_t*)"precache", NULL);
 	xml_get_val_int_args(data, data_size, NULL, (int32_t*)&params->snd_block_min_size,
 	    (const uint8_t*)"sndBlockSize", NULL);
 
