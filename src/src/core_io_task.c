@@ -43,6 +43,7 @@
 
 #include "core_macro.h"
 #include "core_net_helpers.h"
+#include "core_io_net.h"
 #ifdef DEBUG
 #include "core_log.h"
 #endif
@@ -680,18 +681,8 @@ call_cb:
 	cb_ret = IO_TASK_CB_CONTINUE;
 	for (i = 0; i < data2transfer_size; i ++) { /* Accept all connections! */
 		addrlen = sizeof(ssaddr);
-#ifdef SOCK_NONBLOCK /* Linux */
-		/*
-		 * On Linux, the new socket returned by accept() does not
-		 * inherit file status flags such as O_NONBLOCK and O_ASYNC
-		 * from the listening socket.
-		 */
-		skt = accept4(iotask->thrp_data.ident, (struct sockaddr*)&ssaddr,
-		    &addrlen, SOCK_NONBLOCK);
-#else /* Standart / BSD */
-		skt = accept(iotask->thrp_data.ident, (struct sockaddr*)&ssaddr,
-		     &addrlen);
-#endif
+		skt = io_net_accept(iotask->thrp_data.ident,
+		    (struct sockaddr*)&ssaddr, &addrlen, SOCK_NONBLOCK);
 		if ((uintptr_t)-1 == skt) { /* Error. */
 			error = errno;
 			if (0 == error)
@@ -703,10 +694,6 @@ call_cb:
 			}
 			goto call_cb; /* Report about error. */
 		}
-#ifdef SO_NOSIGPIPE
-		cb_ret = 1;
-		setsockopt(skt, SOL_SOCKET, SO_NOSIGPIPE, &cb_ret, sizeof(int));
-#endif
 		cb_ret = ((io_task_accept_cb)iotask->cb_func)(iotask, /*error*/ 0,
 		    skt, &ssaddr, iotask->udata);
 		if (IO_TASK_CB_CONTINUE != cb_ret)

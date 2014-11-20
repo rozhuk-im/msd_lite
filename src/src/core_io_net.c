@@ -67,6 +67,52 @@
 
 
 
+uintptr_t
+io_net_socket(int domain, int type, int protocol) {
+	uintptr_t skt;
+	int on = 1;
+
+#ifdef SOCK_NONBLOCK_EMULATE /* Standart / BSD */
+	skt = socket(domain, (type & ~SOCK_NONBLOCK), protocol);
+	if (0 != (SOCK_NONBLOCK & type))
+		fd_set_nonblocking(skt, 1);
+#else /* Linux / FreeBSD10+ */
+	skt = socket(domain, type, protocol);
+#endif
+	if ((uintptr_t)-1 == skt)
+		return (skt);
+#ifdef SO_NOSIGPIPE
+	setsockopt(skt, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(int));
+#endif
+	if (AF_INET6 == domain) /* Disable IPv4 via IPv6 socket. */
+		setsockopt(skt, IPPROTO_IPV6, IPV6_V6ONLY, &on, sizeof(int));
+	return (skt);
+}
+
+uintptr_t
+io_net_accept(uintptr_t s, struct sockaddr *addr, socklen_t *addrlen, int flags) {
+	uintptr_t skt;
+
+#ifdef SOCK_NONBLOCK_EMULATE /* Standart / BSD */
+	skt = accept(s, addr, addrlen);
+	fd_set_nonblocking(skt, (0 != (SOCK_NONBLOCK & flags)));
+#else /* Linux / FreeBSD10+ */
+	/*
+	 * On Linux, the new socket returned by accept() does not
+	 * inherit file status flags such as O_NONBLOCK and O_ASYNC
+	 * from the listening socket.
+	 */
+	skt = accept4(s, addr, addrlen, flags);
+#endif
+	if ((uintptr_t)-1 == skt)
+		return (skt);
+#ifdef SO_NOSIGPIPE
+	int on = 1;
+	setsockopt(skt, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(int));
+#endif
+	return (skt);
+}
+
 int
 io_net_bind(struct sockaddr_storage *addr, int type, uintptr_t *skt_ret) {
 	uintptr_t skt;
@@ -75,7 +121,7 @@ io_net_bind(struct sockaddr_storage *addr, int type, uintptr_t *skt_ret) {
 	if (NULL == addr || NULL == skt_ret)
 		return (EINVAL);
 		
-	skt = socket(addr->ss_family, (type | SOCK_NONBLOCK), 0);
+	skt = io_net_socket(addr->ss_family, (type | SOCK_NONBLOCK), 0);
 	if ((uintptr_t)-1 == skt) {
 		error = errno;
 		goto err_out;
@@ -85,12 +131,6 @@ io_net_bind(struct sockaddr_storage *addr, int type, uintptr_t *skt_ret) {
 #ifdef SO_REUSEPORT
 	setsockopt(skt, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(int));
 #endif
-#ifdef SO_NOSIGPIPE
-	setsockopt(skt, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(int));
-#endif
-	if (AF_INET6 == addr->ss_family) /* Disable IPv4 via IPv6 socket. */
-		setsockopt(skt, IPPROTO_IPV6, IPV6_V6ONLY, &on, sizeof(int));
-
 	if (-1 == bind(skt, (struct sockaddr*)addr, sa_type2size(addr))) {
 		error = errno;
 		goto err_out;
@@ -442,21 +482,16 @@ io_net_listen(uintptr_t skt, int backlog) {
 int
 io_net_connect(struct sockaddr_storage *addr, uintptr_t *skt_ret) {
 	uintptr_t skt;
-	int error, on = 1;
+	int error;
 
 	if (NULL == addr || NULL == skt_ret)
 		return (EINVAL);
 
-	skt = socket(addr->ss_family, (SOCK_STREAM | SOCK_NONBLOCK), 0);
+	skt = io_net_socket(addr->ss_family, (SOCK_STREAM | SOCK_NONBLOCK), 0);
 	if ((uintptr_t)-1 == skt) {
 		error = errno;
 		goto err_out;
 	}
-#ifdef SO_NOSIGPIPE
-	setsockopt(skt, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(int));
-#endif
-	if (AF_INET6 == addr->ss_family) /* Disable IPv4 via IPv6 socket. */
-		setsockopt(skt, IPPROTO_IPV6, IPV6_V6ONLY, &on, sizeof(int));
 	if (-1 == connect(skt, (struct sockaddr*)addr, sa_type2size(addr))) {
 		error = errno;
 		if (EINPROGRESS != error && EINTR != error)
@@ -550,7 +585,7 @@ io_net_sync_resolv(const char *hname, uint16_t port, int ai_family,
 int
 io_net_sync_resolv_connect(const char *hname, uint16_t port, int ai_family,
     uintptr_t *skt_ret) {
-	int error = 0, on = 1;
+	int error = 0;
 	uintptr_t skt = (uintptr_t)-1;
 	struct addrinfo hints, *res, *res0;
 	char servname[8];
@@ -566,16 +601,11 @@ io_net_sync_resolv_connect(const char *hname, uint16_t port, int ai_family,
 	if (0 != error)  /* NOTREACHED */
 		return (error);
 	for (res = res0; NULL != res; res = res->ai_next) {
-		skt = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+		skt = io_net_socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 		if ((uintptr_t)-1 == skt) {
 			error = errno;
 			continue;
 		}
-#ifdef SO_NOSIGPIPE
-		setsockopt(skt, SOL_SOCKET, SO_NOSIGPIPE, &on, sizeof(int));
-#endif
-		if (AF_INET6 == ai_family) /* Disable IPv4 via IPv6 socket. */
-			setsockopt(skt, IPPROTO_IPV6, IPV6_V6ONLY, &on, sizeof(int));
 		if (connect(skt, res->ai_addr, res->ai_addrlen) < 0) {
 			error = errno;
 			close(skt);

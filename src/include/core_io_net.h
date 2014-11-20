@@ -35,9 +35,14 @@
 #include "core_thrp.h"
 
 
-/*
- * callback then new connection received
- */
+#ifndef SOCK_NONBLOCK
+#define	SOCK_NONBLOCK		0x20000000
+#define	SOCK_NONBLOCK_EMULATE	1
+#endif
+uintptr_t io_net_socket(int domain, int type, int protocol);
+uintptr_t io_net_accept(uintptr_t s, struct sockaddr *addr, socklen_t *addrlen,
+		int flags);
+
 int	io_net_bind(struct sockaddr_storage *addr, int type, uintptr_t *skt_ret);
 int	io_net_bind_ap(int type, int family, void *addr, uint16_t port,
 	    uintptr_t *skt_ret);
