@@ -253,7 +253,6 @@ str_hubs_bckt_create(thrp_p thrp, const char *app_ver, str_hub_params_p hub_para
 		memcpy(osver, "Generic OS/1.0", 15);
 	shbskt->base_http_hdrs_size = snprintf((char*)shbskt->base_http_hdrs,
 	    sizeof(shbskt->base_http_hdrs),
-	    "HTTP/1.1 200 OK\r\n"
 	    "Server: %s %s HTTP stream hub by Rozhuk Ivan\r\n"
 	    "Connection: close\r\n",
 	    osver, app_ver);
@@ -477,6 +476,7 @@ str_hub_create_int(str_hubs_bckt_p shbskt, thrpt_p thrpt, uint8_t *name, size_t 
 	TAILQ_INIT(&str_hub->cli_head);
 	str_hub->thrpt = thrpt;
 	thrpt_gettimev(str_hub->thrpt, 0, &str_hub->tp_last_recv);
+	str_hub->r_buf_fd = (uintptr_t)-1;
 
 	src_params = &shbskt->src_params;
 	memcpy(&str_hub->src_conn_params, src_conn_params, sizeof(str_src_conn_params_t));
@@ -514,7 +514,7 @@ str_hub_create_int(str_hubs_bckt_p shbskt, thrpt_p thrpt, uint8_t *name, size_t 
 	TAILQ_INSERT_HEAD(&shbskt->thr_data[thrp_thread_get_num(thrpt)].hub_head,
 	    str_hub, next);
 
-	LOG_INFO_FMT("%s: Created.", str_hub->name);
+	LOG_INFO_FMT("%s: Created. (fd: %zu)", str_hub->name, skt);
 
 	(*str_hub_ret) = str_hub;
 	return (0);
@@ -581,6 +581,8 @@ str_hub_cli_alloc(uintptr_t skt, const char *ua, size_t ua_size) {
 void
 str_hub_cli_destroy(str_hub_p str_hub, str_hub_cli_p strh_cli) {
 	char straddr[STR_ADDR_LEN];
+	struct msghdr mhdr;
+	struct iovec iov[4];
 
 	LOGD_EV("...");
 
@@ -597,6 +599,22 @@ str_hub_cli_destroy(str_hub_p str_hub, str_hub_cli_p strh_cli) {
 		TAILQ_REMOVE(&str_hub->cli_head, strh_cli, next);
 		str_hub->cli_count --;
 	}
+
+	/* Send HTTP headers if needed. */
+	if (0 == (STR_HUB_CLI_F_HTTP_HDRS_SENDED & strh_cli->flags) &&
+	    0 == strh_cli->offset) {
+		memset(&mhdr, 0, sizeof(mhdr));
+		mhdr.msg_iov = (struct iovec*)iov;
+		mhdr.msg_iovlen = 3;
+		iov[0].iov_base = (uint8_t*)"HTTP/1.1 503 Service Unavailable\r\n";
+		iov[0].iov_len = 34;
+		iov[1].iov_base = (uint8_t*)str_hub->shbskt->base_http_hdrs;
+		iov[1].iov_len = str_hub->shbskt->base_http_hdrs_size;
+		iov[2].iov_base = (uint8_t*)"\r\n";
+		iov[2].iov_len = 2;
+		sendmsg(strh_cli->skt, &mhdr, (MSG_DONTWAIT | MSG_NOSIGNAL));
+	}
+
 	close(strh_cli->skt);
 	memfilld(strh_cli, sizeof(str_hub_cli_t));
 	free(strh_cli);
@@ -778,7 +796,7 @@ str_hub_send_to_clients(str_hub_p str_hub) {
 	int error;
 	str_hub_cli_p strh_cli, strh_cli_temp;
 	struct msghdr mhdr;
-	struct iovec iov[2];
+	struct iovec iov[4];
 	ssize_t ios;
 	size_t transfered_size;
 	char straddr[STR_ADDR_LEN];
@@ -789,11 +807,13 @@ str_hub_send_to_clients(str_hub_p str_hub) {
 		if (0 == (STR_HUB_CLI_F_HTTP_HDRS_SENDED & strh_cli->flags)) {
 			memset(&mhdr, 0, sizeof(mhdr));
 			mhdr.msg_iov = (struct iovec*)iov;
-			mhdr.msg_iovlen = 2;
-			iov[0].iov_base = (uint8_t*)str_hub->shbskt->base_http_hdrs;
-			iov[0].iov_len = str_hub->shbskt->base_http_hdrs_size;
-			iov[1].iov_base = str_hub->shbskt->hub_params.cust_http_hdrs;
-			iov[1].iov_len = str_hub->shbskt->hub_params.cust_http_hdrs_size;
+			mhdr.msg_iovlen = 3;
+			iov[0].iov_base = (uint8_t*)"HTTP/1.1 200 OK\r\n";
+			iov[0].iov_len = 17;
+			iov[1].iov_base = (uint8_t*)str_hub->shbskt->base_http_hdrs;
+			iov[1].iov_len = str_hub->shbskt->base_http_hdrs_size;
+			iov[2].iov_base = str_hub->shbskt->hub_params.cust_http_hdrs;
+			iov[2].iov_len = str_hub->shbskt->hub_params.cust_http_hdrs_size;
 			/* Skeep allready sended data. */
 			iovec_set_offset(mhdr.msg_iov, mhdr.msg_iovlen, strh_cli->offset);
 			ios = sendmsg(strh_cli->skt, &mhdr, (MSG_DONTWAIT | MSG_NOSIGNAL));

@@ -1,7 +1,7 @@
 # Process this file with autoconf to produce a configure script.
 
 
-AC_INIT([msd_lite], [1.07], [rozhuk.im@gmail.com], [msd_lite], [http://www.netlab.linkpc.net/])
+AC_INIT([msd_lite], [1.08], [rozhuk.im@gmail.com], [msd_lite], [http://www.netlab.linkpc.net/])
 AC_CONFIG_SRCDIR([src/msd_lite.c])
 AC_CONFIG_HEADER([src/config.h])
 AM_INIT_AUTOMAKE

@@ -62,6 +62,7 @@
 #include "core_http_srv.h"
 #include "stream_sys.h"
 #include "core_info.h"
+#include "core_log.h"
 #include "msd_lite_stat_text.h"
 
 
@@ -357,7 +358,7 @@ gen_stat_text(const char *package_name, const char *package_version,
 		return (error);
 	buf = http_srv_cli_get_buf(cli);
 
-	time_work = difftime(thrpt_gettime(NULL, 0), http_srv_stat.start_time);
+	time_work = difftime(thrpt_gettime(NULL, 0), http_srv_stat.start_time_abs);
 	if (0 == time_work) /* Prevent division by zero. */
 		time_work ++;
 	/* Server stat. */

@@ -189,7 +189,7 @@ typedef struct str_hubs_bckt_s {
 	thrp_udata_t	service_tmr;	/* Service timer. */
 	str_hub_thrd_p	thr_data;	/* Per thread hubs + stat. */
 	size_t		base_http_hdrs_size;
-	uint8_t		base_http_hdrs[256];
+	uint8_t		base_http_hdrs[512];
 	str_hub_params_t hub_params;	/* Settings. */
 	str_src_params_t src_params;	/* Settings. */
 } str_hubs_bckt_t;

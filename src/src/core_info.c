@@ -111,15 +111,11 @@ sysctl_str_to_buf(int *mib, u_int mib_cnt, const char *descr, size_t descr_size,
 #endif /* Linux specific code. */
 	}
 	memcpy(buf, descr, descr_size);
-	/* Remove CR, LF, TAB, SP, NUL from end */
+	/* Remove CR, LF, TAB, SP, NUL... from end. */
 	tm += descr_size;
-	while (descr_size < tm && (
-	    '\r' == buf[(tm - 1)] ||
-	    '\n' == buf[(tm - 1)] ||
-	    '\t' == buf[(tm - 1)] ||
-	    ' ' == buf[(tm - 1)] ||
-	    0 == buf[(tm - 1)]))
+	while (descr_size < tm && ' ' >= buf[(tm - 1)])
 		tm --;
+	buf[tm] = 0;
 	if (NULL != buf_size_ret)
 		(*buf_size_ret) = tm;
 	return (0);
@@ -149,6 +145,7 @@ core_info_get_os_ver(const char *separator, size_t separator_size,
 		return (error);
 	buf_used += tm;
 
+	buf[buf_used] = 0;
 	if (NULL != buf_size_ret)
 		(*buf_size_ret) = buf_used;
 	return (0);
@@ -208,9 +205,7 @@ core_info_sysinfo(uint8_t *buf, size_t buf_size, size_t *buf_size_ret) {
 
 	buf_used += snprintf((char*)(buf + buf_used), (buf_size - buf_used),
 	    "\r\n"
-#ifndef BSD
 	    "\r\n"
-#endif
 	    "Hardware");
 
 	/* Hardware */
