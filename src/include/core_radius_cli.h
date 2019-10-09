@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2014 - 2015 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -62,9 +62,9 @@ typedef struct radius_cli_server_settings_s {
 	uint8_t		shared_secret[RADIUS_A_T_USER_PASSWORD_MAX_LEN];
 	size_t		shared_secret_size;
 	/* Retransmission params from rfc5080. */
-	uintptr_t	retrans_time_init; /* IRT - Initial retransmission time in ms. */
-	uintptr_t	retrans_time_max; /* MRT - Maximum retransmission time in ms. */
-	uintptr_t	retrans_duration_max; /* MRD - Maximum retransmission duration in ms. */
+	uint64_t	retrans_time_init; /* IRT - Initial retransmission time in ms. */
+	uint64_t	retrans_time_max; /* MRT - Maximum retransmission time in ms. */
+	uint64_t	retrans_duration_max; /* MRD - Maximum retransmission duration in ms. */
 	size_t		retrans_count_max; /* MRC - Maximum retransmission count. */
 	struct sockaddr_storage	addr;	/* Server addr. */
 } radius_cli_srv_settings_t, *radius_cli_srv_settings_p;
@@ -81,6 +81,19 @@ typedef void (*radius_cli_cb)(radius_cli_query_p query, rad_pkt_hdr_p pkt,
 
 
 void	radius_client_def_settings(radius_cli_settings_p s);
+#ifdef RADIUS_CLIENT_XML_CONFIG
+int	radius_client_xml_load_settings(const uint8_t *buf, size_t buf_size,
+	    radius_cli_settings_p s);
+int	radius_client_server_xml_load_settings(const uint8_t *buf, size_t buf_size,
+	    radius_cli_srv_settings_p s);
+int	radius_client_xml_load_start(const uint8_t *buf, size_t buf_size,
+	    thrp_p thrp,
+	    radius_cli_settings_p cli_settings,
+	    radius_cli_srv_settings_p cli_srv_settings,
+	    radius_cli_p *rad_cli);
+#endif
+
+
 int	radius_client_create(thrp_p thrp, radius_cli_settings_p s,
 	    radius_cli_p *rad_cli_ret);
 void	radius_client_destroy(radius_cli_p rad_cli);

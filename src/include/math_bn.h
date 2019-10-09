@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2013 - 2014 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2013 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,6 +46,7 @@
 #	define uint64_t		DWORDLONG
 #	define size_t		SIZE_T
 #	define ssize_t		SSIZE_T
+#	define __unused
 #else
 #	include <sys/types.h>
 #	include <inttypes.h>
@@ -117,54 +118,54 @@
 #define BN_MAX_DIGITS	(BN_BIT_LEN / BN_DIGIT_BITS)
 
 /* Swap a and b */
-#define bn_digit_swap(a, b)							\
-{										\
-	register bn_digit_t t = (a);						\
-	(a) = (b);								\
-	(b) = t;								\
+#define bn_digit_swap(__a, __b)						\
+{									\
+	register bn_digit_t __t = (__a);				\
+	(__a) = (__b);							\
+	(__b) = __t;							\
 }
 
-#define bn_swap_ptr(a, b)							\
-{										\
-	register bn_p t = (a);							\
-	(a) = (b);								\
-	(b) = t;								\
+#define bn_swap_ptr(__a, __b)						\
+{									\
+	register bn_p __t = (__a);					\
+	(__a) = (__b);							\
+	(__b) = __t;							\
 }
 
 
 #if defined(DEBUG) || defined(_DEBUG)
 
 #ifdef _WINDOWS
-#define BN_RET_ON_ERR(a)							\
-{										\
-	int ret_error = (a);							\
-	if (0 != ret_error) {							\
-		CHAR err_msg_buf[128];						\
-		wsprintfA(err_msg_buf, "%s:%i %s: error = %i\r\n",		\
-		    __FILE__, __LINE__, __FUNCTION__, ret_error);		\
-		OutputDebugStringA(err_msg_buf);				\
-		return (ret_error);						\
-	}									\
+#define BN_RET_ON_ERR(__err)						\
+{									\
+	int ret_error = (__err);					\
+	if (0 != ret_error) {						\
+		CHAR err_msg_buf[128];					\
+		wsprintfA(err_msg_buf, "%s:%i %s: error = %i\r\n",	\
+		    __FILE__, __LINE__, __FUNCTION__, ret_error);	\
+		OutputDebugStringA(err_msg_buf);			\
+		return (ret_error);					\
+	}								\
 }
 #else
-#define BN_RET_ON_ERR(a)							\
-{										\
-	int ret_error = (a);							\
-	if (0 != ret_error) {							\
-		fprintf(stderr, "%s:%i %s: error = %i\r\n",			\
-		    __FILE__, __LINE__, __FUNCTION__, ret_error);		\
-		return (ret_error);						\
-	}									\
+#define BN_RET_ON_ERR(__err)						\
+{									\
+	int ret_error = (__err);					\
+	if (0 != ret_error) {						\
+		fprintf(stderr, "%s:%i %s: error = %i\r\n",		\
+		    __FILE__, __LINE__, __FUNCTION__, ret_error);	\
+		return (ret_error);					\
+	}								\
 }
 #endif /* _WINDOWS */
 
 #else /* NODEBUG */
 
-#define BN_RET_ON_ERR(a)							\
-{										\
-	int ret_error = (a);							\
-	if (0 != ret_error)							\
-		return (ret_error);						\
+#define BN_RET_ON_ERR(__err)						\
+{									\
+	int ret_error = (__err);					\
+	if (0 != ret_error)						\
+		return (ret_error);					\
 }
 
 #endif /* _DEBUG */
@@ -176,31 +177,31 @@
 #	include <pmmintrin.h> /* SSE3 */
 #	include <tmmintrin.h> /* SSSE3 */
 #	include <smmintrin.h> /* SSE4.1 */
-#	include <nmmintrin.h> /* SSE4.1 */
-#	define BN_PREFETCH(ptr)	_mm_prefetch((char*)(ptr), _MM_HINT_T2) //_MM_HINT_NTA
+#	include <nmmintrin.h> /* SSE4.2 */
+#	define BN_PREFETCH(__prt)	_mm_prefetch((const char*)(__prt), _MM_HINT_T2) //_MM_HINT_NTA
 #elif defined(__clang__) || defined(__GNUC__) /* NO: BN_USE_SSE */
-#	define BN_PREFETCH(ptr)	__builtin_prefetch((ptr), 0, 0)
+#	define BN_PREFETCH(__prt)	__builtin_prefetch((__prt), 0, 0)
 #else /* NO: BN_USE_SSE || __clang__ || __GNUC__ */
-#	define BN_PREFETCH(ptr)
+#	define BN_PREFETCH(__prt)
 #endif /* BN_USE_SSE || __clang__ || __GNUC__ */
 
-#define BN_PREFETCH_BN_DATA(bn)			BN_PREFETCH(((char*)(bn)->num))
-#define BN_PREFETCH_DIGITS(digits, count)	BN_PREFETCH(((char*)(digits)))
+#define BN_PREFETCH_BN_DATA(__bn)		BN_PREFETCH(((const char*)(__bn)->num))
+#define BN_PREFETCH_DIGITS(__digits, __count)	BN_PREFETCH(((const char*)(__digits)))
 //#define BN_PREFETCH_DIGITS(digits, count)
 
 
 
 #if defined(_MSC_VER) || defined(__INTEL_COMPILER)
-#	define BN_ALIGN(v) __declspec(align(v)) /* DECLSPEC_ALIGN() */
+#	define BN_ALIGN(__n) __declspec(align(__n)) /* DECLSPEC_ALIGN() */
 #else /* GCC/clang */
-#	define BN_ALIGN(v) __attribute__((aligned(v)))
+#	define BN_ALIGN(__n) __attribute__((aligned(__n)))
 #endif
 
 
 #ifndef BN_NO_POINTERS_CHK
-#	define BN_POINTER_CHK_EINVAL(a)	if (NULL == (a)) return (EINVAL);
+#	define BN_POINTER_CHK_EINVAL(__prt) if (NULL == (__prt)) return (EINVAL);
 #else
-#	define BN_POINTER_CHK_EINVAL(a)
+#	define BN_POINTER_CHK_EINVAL(__prt)
 #endif
 
 
@@ -280,9 +281,11 @@ bn_digit_bits(bn_digit_t digit) {
 	reg = (((reg >> 4) + reg) & 0x0f);
 	n = (reg & 0x0f);
 #else /* Original un optimized code. */
-	for (n = 0; 0 != reg; reg >>= 1)
-		if (0 != (reg & 1))
+	for (n = 0; 0 != reg; reg >>= 1) {
+		if (0 != (reg & 1)) {
 			n ++;
+		}
+	}
 #endif
 	return (n);
 }
@@ -389,8 +392,9 @@ bn_digit_clz(bn_digit_t digit) {
 		reg &= 0xcccccccccccccccc;
 		n -= 2;
 	}
-	if (reg & 0xaaaaaaaaaaaaaaaa)
+	if (reg & 0xaaaaaaaaaaaaaaaa) {
 		n --;
+	}
 #elif BN_DIGIT_BIT_CNT == 32
 	if (reg & 0xffff0000) {
 		reg &= 0xffff0000;
@@ -408,8 +412,9 @@ bn_digit_clz(bn_digit_t digit) {
 		reg &= 0xcccccccc;
 		n -= 2;
 	}
-	if (reg & 0xaaaaaaaa)
+	if (reg & 0xaaaaaaaa) {
 		n --;
+	}
 #elif BN_DIGIT_BIT_CNT == 16
 	if (reg & 0xff00) {
 		reg &= 0xff00;
@@ -423,8 +428,9 @@ bn_digit_clz(bn_digit_t digit) {
 		reg &= 0xcccc;
 		n -= 2;
 	}
-	if (reg & 0xaaaa)
+	if (reg & 0xaaaa) {
 		n --;
+	}
 #elif BN_DIGIT_BIT_CNT == 8
 	if (reg & 0xf0) {
 		reg &= 0xf0;
@@ -434,8 +440,9 @@ bn_digit_clz(bn_digit_t digit) {
 		reg &= 0xcc;
 		n -= 2;
 	}
-	if (reg & 0xaa)
+	if (reg & 0xaa) {
 		n --;
+	}
 #else /* Original un optimized code. */
 	for (n = 0; 0 == (reg & BN_DIGIT_HI_BIT); n ++, reg <<= 1)
 		;
@@ -443,7 +450,7 @@ bn_digit_clz(bn_digit_t digit) {
 	return (n);
 }
 
-/* Determining if an digit is a power of 2  */
+/* Determining if an digit is a power of 2 */
 #define bn_digit_is_pow2(digit)		((0 != digit && 0 == (digit & (digit - 1))))
 
 
@@ -527,13 +534,15 @@ bn_digit_mult__int(bn_digit_t a, bn_digit_t b,
 	while (0 != reg_multiplier) {
 		if (1 & reg_multiplier) {
 			reg_res_lo += reg_multiplicand;
-			if (reg_res_lo < reg_multiplicand)
+			if (reg_res_lo < reg_multiplicand) {
 				reg_res_hi ++;
+			}
 			reg_res_hi += reg_multiplicand_hi;
 		}
 		reg_multiplicand_hi <<= 1;
-		if (BN_DIGIT_HI_BIT & reg_multiplicand)
+		if (BN_DIGIT_HI_BIT & reg_multiplicand) {
 			reg_multiplicand_hi |= 1;
+		}
 		reg_multiplicand <<= 1;
 		reg_multiplier >>= 1;
 	}
@@ -639,8 +648,8 @@ bn_digit_div__int(bn_digit_t dividend_lo, bn_digit_t dividend_hi, bn_digit_t div
 		(*result_lo) = ((reg_dividend_lo >> num_bits) |
 		    (reg_dividend_hi << (BN_DIGIT_BITS - num_bits)));
 		(*result_hi) = (reg_dividend_hi >> num_bits);
-		(*remainder_lo) = (reg_dividend_lo & ((1 << num_bits) - 1));
-		(*remainder_hi) = (reg_dividend_hi & ((1 << (BN_DIGIT_BITS - num_bits)) - 1));
+		(*remainder_lo) = (reg_dividend_lo & ((((bn_digit_t)1) << num_bits) - 1));
+		(*remainder_hi) = (reg_dividend_hi & ((((bn_digit_t)1) << (BN_DIGIT_BITS - num_bits)) - 1));
 		return (0);
 	}
 #endif
@@ -657,23 +666,26 @@ bn_digit_div__int(bn_digit_t dividend_lo, bn_digit_t dividend_hi, bn_digit_t div
 	}
 	for (; num_bits != 0; num_bits --) {
 		reg_quotient_hi <<= 1;
-		if (BN_DIGIT_HI_BIT & reg_quotient_lo)
+		if (BN_DIGIT_HI_BIT & reg_quotient_lo) {
 			reg_quotient_hi |= 1;
+		}
 		reg_quotient_lo <<= 1;
 
 		if ((reg_divisor < reg_dividend_hi) ||
 		    ((reg_divisor == reg_dividend_hi) &&
 		     (reg_divisor_lo <= reg_dividend_lo))) {
 			reg_dividend_hi -= reg_divisor;
-			if (reg_dividend_lo < reg_divisor_lo)
+			if (reg_dividend_lo < reg_divisor_lo) {
 				reg_dividend_hi --;
+			}
 			reg_dividend_lo -= reg_divisor_lo;
 			reg_quotient_lo |= 1;
 		}
 
 		reg_divisor_lo >>= 1;
-		if (1 & reg_divisor)
+		if (1 & reg_divisor) {
 			reg_divisor_lo |= BN_DIGIT_HI_BIT;
+		}
 		reg_divisor >>= 1;
 	}
 	(*result_lo) = reg_quotient_lo;
@@ -754,15 +766,17 @@ bn_digit_div__int_short(bn_digit_t dividend_lo, bn_digit_t dividend_hi, bn_digit
 		    ((reg_divisor == reg_dividend_hi) &&
 		     (reg_divisor_lo <= reg_dividend_lo))) {
 			reg_dividend_hi -= reg_divisor;
-			if (reg_dividend_lo < reg_divisor_lo)
+			if (reg_dividend_lo < reg_divisor_lo) {
 				reg_dividend_hi --;
+			}
 			reg_dividend_lo -= reg_divisor_lo;
 			reg_quotient_lo |= 1;
 		}
 
 		reg_divisor_lo >>= 1;
-		if (1 & reg_divisor)
+		if (1 & reg_divisor) {
 			reg_divisor_lo |= BN_DIGIT_HI_BIT;
+		}
 		reg_divisor >>= 1;
 	}
 	(*result_lo) = reg_quotient_lo;
@@ -816,8 +830,9 @@ bn_digit_gcd(bn_digit_t a, bn_digit_t b) {
 		return (b);
 	if (0 == b || a == b)
 		return (a);
-	if (a < b)
+	if (a < b) {
 		bn_digit_swap(a, b);
+	}
 	while (0 != b) {
 		//BN_RET_ON_ERR(bn_digit_div__int(a, 0, b, NULL, NULL, &a, NULL)); /* a = a mod b */
 		a = (a % b);
@@ -847,12 +862,14 @@ bn_digit_gcd_bin(bn_digit_t a, bn_digit_t b) {
 	/* From here on, a is always odd. */
 	while (0 != reg_b) {
 		/* Remove all factors of 2 in b -- they are not common. */
-		while (0 == (reg_b & 1))
+		while (0 == (reg_b & 1)) {
 			reg_b >>= 1;
+		}
 		/* Now a and b are both odd. Swap if necessary so a <= b,
 		 * then set b -= a (which is even). */
-		if (reg_a > reg_b)
+		if (reg_a > reg_b) {
 			bn_digit_swap(reg_a, reg_b);
+		}
 		reg_b -= reg_a; /* Here b >= a. */
 	}
 	reg_a <<= shift; /* Restore common factors of 2. */
@@ -921,11 +938,11 @@ bn_digits_calc_digits(bn_digit_t *a, size_t count) {
 
 	if (NULL == a || 0 == count)
 		return (0);
-	for (i = (count - 1); i >= 0; i --) {
+	for (i = (ssize_t)(count - 1); i >= 0; i --) {
 		if (0 != a[i])
 			break;
 	}
-	return ((i + 1));
+	return ((size_t)(i + 1));
 }
 
 /* Returns: sign of a - b. */
@@ -942,7 +959,7 @@ bn_digits_cmp(bn_digit_t *a, bn_digit_t *b, size_t count) {
 			return (1);
 		return (-1);
 	}
-	for (i = (count - 1); i >= 0; i --) {
+	for (i = (ssize_t)(count - 1); i >= 0; i --) {
 		if (a[i] == b[i])
 			continue;
 		if (a[i] > b[i])
@@ -956,9 +973,10 @@ bn_digits_cmp(bn_digit_t *a, bn_digit_t *b, size_t count) {
 /*------------------------- Conversion functions -----------------------------*/
 /* Import big-endian bin num. */
 static inline int
-bn_digits_import_be_bin(bn_digit_t *a, size_t count, uint8_t *buf, size_t buf_size,
-    size_t *count_ret) {
-	register uint8_t *r_pos, *w_pos;
+bn_digits_import_be_bin(bn_digit_t *a, size_t count,
+    const uint8_t *buf, size_t buf_size, size_t *count_ret) {
+	register const uint8_t *r_pos;
+	register uint8_t *w_pos;
 
 	BN_POINTER_CHK_EINVAL(a);
 	BN_POINTER_CHK_EINVAL(buf);
@@ -969,8 +987,9 @@ bn_digits_import_be_bin(bn_digit_t *a, size_t count, uint8_t *buf, size_t buf_si
 	r_pos = (buf + (buf_size - 1));
 	w_pos = (uint8_t*)a;
 	BN_PREFETCH_DIGITS(buf, count);
-	for (; r_pos >= buf; r_pos --, w_pos ++)
+	for (; r_pos >= buf; r_pos --, w_pos ++) {
 		(*w_pos) = (*r_pos);
+	}
 	if (NULL == count_ret) {
 		memset(w_pos, 0, ((count * BN_DIGIT_SIZE) - buf_size));
 	} else {
@@ -997,8 +1016,9 @@ bn_digits_export_be_bin(bn_digit_t *a, size_t count, uint32_t flags,
 	w_pos = buf;
 	w_pos_max = (w_pos + buf_size);
 	if (0 == count) { /* is a = 0? */
-		if (0 != (flags & BN_EXPORT_F_AUTO_SIZE))
+		if (0 != (flags & BN_EXPORT_F_AUTO_SIZE)) {
 			buf_size = 1;
+		}
 		memset(w_pos, 0, buf_size);
 		if (NULL != buf_size_ret)
 			(*buf_size_ret) = buf_size;
@@ -1010,7 +1030,7 @@ bn_digits_export_be_bin(bn_digit_t *a, size_t count, uint32_t flags,
 	r_pos = (r_pos_min + (count * BN_DIGIT_SIZE) - 1);
 	for (; r_pos >= r_pos_min && 0 == (*r_pos); r_pos --)
 		;
-	tm = (1 + r_pos - r_pos_min);
+	tm = (size_t)(1 + r_pos - r_pos_min);
 	if (0 != (flags & BN_EXPORT_F_AUTO_SIZE)) {
 		if (NULL != buf_size_ret)
 			(*buf_size_ret) = tm;
@@ -1024,15 +1044,16 @@ bn_digits_export_be_bin(bn_digit_t *a, size_t count, uint32_t flags,
 		memset(w_pos, 0, (buf_size - tm));
 		w_pos += (buf_size - tm);
 	}
-	for (; r_pos >= r_pos_min && w_pos_max > w_pos; r_pos --, w_pos ++)
+	for (; r_pos >= r_pos_min && w_pos_max > w_pos; r_pos --, w_pos ++) {
 		(*w_pos) = (*r_pos);
+	}
 	return (0);
 }
 
 /* Import from little-endian bin num. */
 static inline int
-bn_digits_import_le_bin(bn_digit_t *a, size_t count, uint8_t *buf, size_t buf_size,
-    size_t *count_ret) {
+bn_digits_import_le_bin(bn_digit_t *a, size_t count,
+    const uint8_t *buf, size_t buf_size, size_t *count_ret) {
 
 	BN_POINTER_CHK_EINVAL(a);
 	BN_POINTER_CHK_EINVAL(buf);
@@ -1066,9 +1087,10 @@ bn_digits_export_le_bin(bn_digit_t *a, size_t count, uint32_t flags,
 	if (0 == buf_size)
 		return (EINVAL);
 	bn_size = (count * BN_DIGIT_SIZE);
-	if (NULL != buf_size_ret)
+	if (NULL != buf_size_ret) {
 		(*buf_size_ret) = ((0 != (flags & BN_EXPORT_F_AUTO_SIZE)) ?
 		    bn_size : buf_size);
+	}
 	if (bn_size > buf_size) { /* Additional check: zero bytes in last digit */
 		ddiff = (bn_size - buf_size);
 		if (ddiff > BN_DIGIT_SIZE)
@@ -1084,15 +1106,18 @@ bn_digits_export_le_bin(bn_digit_t *a, size_t count, uint32_t flags,
 	}
 	memcpy(buf, a, bn_size);
 	if (bn_size < buf_size &&
-	    0 == (flags & BN_EXPORT_F_AUTO_SIZE)) /* Zeroize end. */
+	    0 == (flags & BN_EXPORT_F_AUTO_SIZE)) { /* Zeroize end. */
 		memset((buf + bn_size), 0, (buf_size - bn_size));
+	}
 	return (0);
 }
 
 /* Import from little-endian hex string (L->H). */
 static inline int
-bn_digits_import_le_hex(bn_digit_t *a, size_t count, uint8_t *buf, size_t buf_size) {
-	register uint8_t *r_pos, *r_pos_max, *w_pos, *w_pos_max, cur_char, byte;
+bn_digits_import_le_hex(bn_digit_t *a, size_t count,
+    const uint8_t *buf, size_t buf_size) {
+	register const uint8_t *r_pos, *r_pos_max;
+	register uint8_t *w_pos, *w_pos_max, cur_char, byte = 0;
 	register size_t cnt;
 
 	BN_POINTER_CHK_EINVAL(a);
@@ -1109,15 +1134,16 @@ bn_digits_import_le_hex(bn_digit_t *a, size_t count, uint8_t *buf, size_t buf_si
 	BN_PREFETCH_DIGITS(buf, count);
 	for (cnt = 0; r_pos < r_pos_max; r_pos ++) {
 		cur_char = (*r_pos);
-		if ('0' <= cur_char && '9' >= cur_char)
+		if ('0' <= cur_char && '9' >= cur_char) {
 			cur_char -= '0';
-		else if ('a' <= cur_char && 'f' >= cur_char)
+		} else if ('a' <= cur_char && 'f' >= cur_char) {
 			cur_char -= ('a' - 10);
-		else if ('A' <= cur_char && 'F' >= cur_char)
+		} else if ('A' <= cur_char && 'F' >= cur_char) {
 			cur_char -= ('A' - 10);
-		else
+		} else {
 			continue;
-		byte = ((byte << 4) | cur_char);
+		}
+		byte = (((uint8_t)(byte << 4)) | cur_char);
 		cnt ++;
 		if (2 > cnt) /* Wait untill 4 + 4 bit before write a byte. */
 			continue;
@@ -1127,14 +1153,14 @@ bn_digits_import_le_hex(bn_digit_t *a, size_t count, uint8_t *buf, size_t buf_si
 		byte = 0;
 		cnt = 0;
 	}
-	memset(w_pos, 0, (w_pos_max - w_pos));
+	memset(w_pos, 0, (size_t)(w_pos_max - w_pos));
 	return (0);
 }
 /* Export to little-endian hex string (L->H). */
 static inline int
 bn_digits_export_le_hex(bn_digit_t *a, size_t count, uint32_t flags,
     uint8_t *buf, size_t buf_size, size_t *buf_size_ret) {
-	static uint8_t *hex_tbl = (uint8_t*)"0123456789abcdef";
+	static const uint8_t *hex_tbl = (const uint8_t*)"0123456789abcdef";
 	register uint8_t *r_pos, *r_pos_max, *w_pos, *w_pos_max, byte;
 	size_t tm;
 
@@ -1148,7 +1174,7 @@ bn_digits_export_le_hex(bn_digit_t *a, size_t count, uint32_t flags,
 		if (0 != (flags & BN_EXPORT_F_AUTO_SIZE)) {
 			buf_size = 2;
 		} else {
-			buf_size &= ~1;
+			buf_size &= ~((size_t)1);
 		}
 		memset(w_pos, '0', buf_size);
 		w_pos += buf_size;
@@ -1170,22 +1196,25 @@ bn_digits_export_le_hex(bn_digit_t *a, size_t count, uint32_t flags,
 	}
 	if (0 == (flags & BN_EXPORT_F_AUTO_SIZE)) { /* Zeroize end. */
 		buf_size -= tm;
-		buf_size &= ~1;
+		buf_size &= ~((size_t)1);
 		memset(w_pos, '0', buf_size);
 		w_pos += buf_size;
 	}
 ok_exit:
-	if (w_pos_max > w_pos) /* Zero end of string. */
+	if (w_pos_max > w_pos) { /* Zero end of string. */
 		(*w_pos) = 0;
+	}
 	if (NULL != buf_size_ret)
-		(*buf_size_ret) = (w_pos - buf);
+		(*buf_size_ret) = (size_t)(w_pos - buf);
 	return (0);
 }
 
 /* Import from big-endian hex string (H->L). */
 static inline int
-bn_digits_import_be_hex(bn_digit_t *a, size_t count, uint8_t *buf, size_t buf_size) {
-	register uint8_t *r_pos, *w_pos, *w_pos_max, cur_char, byte;
+bn_digits_import_be_hex(bn_digit_t *a, size_t count,
+    const uint8_t *buf, size_t buf_size) {
+	register const uint8_t *r_pos;
+	register uint8_t *w_pos, *w_pos_max, cur_char, byte = 0;
 	register size_t cnt;
 
 	BN_POINTER_CHK_EINVAL(a);
@@ -1201,15 +1230,16 @@ bn_digits_import_be_hex(bn_digit_t *a, size_t count, uint8_t *buf, size_t buf_si
 	BN_PREFETCH_DIGITS(buf, count);
 	for (cnt = 0; r_pos >= buf; r_pos --) {
 		cur_char = (*r_pos);
-		if ('0' <= cur_char && '9' >= cur_char)
+		if ('0' <= cur_char && '9' >= cur_char) {
 			cur_char -= '0';
-		else if ('a' <= cur_char && 'f' >= cur_char)
+		} else if ('a' <= cur_char && 'f' >= cur_char) {
 			cur_char -= ('a' - 10);
-		else if ('A' <= cur_char && 'F' >= cur_char)
+		} else if ('A' <= cur_char && 'F' >= cur_char) {
 			cur_char -= ('A' - 10);
-		else
+		} else {
 			continue;
-		byte = ((byte >> 4) | (cur_char << 4));
+		}
+		byte = ((byte >> 4) | ((uint8_t)(cur_char << 4)));
 		cnt ++;
 		if (2 > cnt) /* Wait untill 4 + 4 bit before write a byte. */
 			continue;
@@ -1219,14 +1249,14 @@ bn_digits_import_be_hex(bn_digit_t *a, size_t count, uint8_t *buf, size_t buf_si
 		byte = 0;
 		cnt = 0;
 	}
-	memset(w_pos, 0, (w_pos_max - w_pos));
+	memset(w_pos, 0, (size_t)(w_pos_max - w_pos));
 	return (0);
 }
 /* Export to big-endian hex string (H->L). */
 static inline int
 bn_digits_export_be_hex(bn_digit_t *a, size_t count, uint32_t flags,
     uint8_t *buf, size_t buf_size, size_t *buf_size_ret) {
-	static uint8_t *hex_tbl = (uint8_t*)"0123456789abcdef";
+	static const uint8_t *hex_tbl = (const uint8_t*)"0123456789abcdef";
 	register uint8_t *r_pos, *r_pos_min, *w_pos, *w_pos_max, byte;
 	size_t tm;
 
@@ -1240,7 +1270,7 @@ bn_digits_export_be_hex(bn_digit_t *a, size_t count, uint32_t flags,
 		if (0 != (flags & BN_EXPORT_F_AUTO_SIZE)) {
 			buf_size = 2;
 		} else {
-			buf_size &= ~1;
+			buf_size &= ~((size_t)1);
 		}
 		memset(w_pos, '0', buf_size);
 		w_pos += buf_size;
@@ -1252,7 +1282,7 @@ bn_digits_export_be_hex(bn_digit_t *a, size_t count, uint32_t flags,
 	BN_PREFETCH_DIGITS(a, count);
 	for (; r_pos >= r_pos_min && 0 == (*r_pos); r_pos --)
 		;
-	tm = (2 * (1 + r_pos - r_pos_min));
+	tm = (size_t)(2 * (1 + r_pos - r_pos_min));
 	if (tm > buf_size) { /* Not enouth space in buf. */
 		if (NULL != buf_size_ret)
 			(*buf_size_ret) = tm;
@@ -1260,7 +1290,7 @@ bn_digits_export_be_hex(bn_digit_t *a, size_t count, uint32_t flags,
 	}
 	if (0 == (flags & BN_EXPORT_F_AUTO_SIZE)) { /* Zeroize start. */
 		buf_size -= tm;
-		buf_size &= ~1;
+		buf_size &= ~((size_t)1);
 		memset(w_pos, '0', buf_size);
 		w_pos += buf_size;
 	}
@@ -1270,10 +1300,11 @@ bn_digits_export_be_hex(bn_digit_t *a, size_t count, uint32_t flags,
 		(*w_pos ++) = hex_tbl[(byte & 0x0f)];
 	}
 ok_exit:
-	if (w_pos_max > w_pos) /* Zero end of string. */
+	if (w_pos_max > w_pos) { /* Zero end of string. */
 		(*w_pos) = 0;
+	}
 	if (NULL != buf_size_ret)
-		(*buf_size_ret) = (w_pos - buf);
+		(*buf_size_ret) = (size_t)(w_pos - buf);
 	return (0);
 }
 
@@ -1314,7 +1345,7 @@ bn_digits_l_shift(bn_digit_t *a, size_t count, size_t bits) {
 		if (0 == crr_bits_cnt)
 			return;
 		bits -= (i * 8);
-		i /= BN_DIGIT_SIZE; /* Skeep zero digits at start. */
+		i /= BN_DIGIT_SIZE; /* Skip zero digits at start. */
 	}
 	crr_bits_cnt = (BN_DIGIT_BITS - bits);
 	for (; i < count; i ++) {
@@ -1345,12 +1376,13 @@ bn_digits_r_shift(bn_digit_t *a, size_t count, size_t bits) {
 		if (0 == crr_bits_cnt)
 			return;
 		bits -= (i * 8);
-		count -= (i / BN_DIGIT_SIZE); /* Skeep zero digits at end. */
+		count -= (i / BN_DIGIT_SIZE); /* Skip zero digits at end. */
 	}
 
 	crr_bits_cnt = (BN_DIGIT_BITS - bits);
-	for (i = 0; i < (count - 1); i ++)
+	for (i = 0; i < (count - 1); i ++) {
 		a[i] = ((a[i] >> bits) | (a[(i + 1)] << crr_bits_cnt));
+	}
 	a[i] = (a[i] >> bits);
 }
 
@@ -1358,7 +1390,7 @@ bn_digits_r_shift(bn_digit_t *a, size_t count, size_t bits) {
 static inline void
 bn_digits_add_digit(bn_digit_t *a, size_t count, bn_digit_t b, bn_digit_t *carry) {
 	register size_t i;
-	register bn_digit_t crr;
+	register bn_digit_t crr = 0;
 
 	if (NULL == a || 0 == count || 0 == b)
 		goto ok_exit;
@@ -1372,13 +1404,14 @@ bn_digits_add_digit(bn_digit_t *a, size_t count, bn_digit_t b, bn_digit_t *carry
 	}
 #else
 	a[0] += b;
-	if (a[0] < b) {
-		crr = 1;
-		for (i = 1; 0 != crr && i < count; i ++) {
-			a[i] += crr;
-			crr = ((a[i] < crr) ? 1 : 0);
-		}
+	if (a[0] >= b)
+		goto ok_exit;
+	for (i = 1; i < count; i ++) {
+		a[i] ++;
+		if (1 <= a[i])
+			goto ok_exit;
 	}
+	crr ++;
 #endif
 ok_exit:
 	if (NULL != carry)
@@ -1412,8 +1445,9 @@ bn_digits_add(bn_digit_t *a, size_t a_count, bn_digit_t *b, size_t b_count,
 		if (0 == tm)
 			continue;
 		a[i] += tm;
-		if (a[i] < tm)
+		if (a[i] < tm) {
 			crr = 1;
+		}
 	}
 	if (0 != crr && a_count > b_count) {
 		bn_digits_add_digit(&a[b_count], (a_count - b_count), crr, carry);
@@ -1435,8 +1469,9 @@ bn_digits_sub_digit(bn_digit_t *a, size_t count, bn_digit_t b, bn_digit_t *borro
 		goto ok_exit;
 	BN_PREFETCH_DIGITS(a, a_count);
 	a[0] -= b;
-	if (a[0] > (BN_MAX_DIGIT - b))
+	if (a[0] > (BN_MAX_DIGIT - b)) {
 		brrw = 1;
+	}
 	for (i = 1; 0 != brrw && i < count; i ++) {
 		a[i] -= brrw;
 		brrw = ((a[i] > (BN_MAX_DIGIT - brrw)) ? 1 : 0);
@@ -1468,8 +1503,9 @@ bn_digits_sub__int(bn_digit_t *a, size_t a_count, bn_digit_t *b, size_t b_count,
 		if (0 == tm)
 			continue;
 		a[i] -= tm;
-		if (a[i] > (BN_MAX_DIGIT - tm))
+		if (a[i] > (BN_MAX_DIGIT - tm)) {
 			brrw = 1;
+		}
 	}
 	if (0 != brrw && a_count > b_count) {
 		bn_digits_sub_digit(&a[b_count], (a_count - b_count), brrw, borrow);
@@ -1515,8 +1551,9 @@ bn_digits_mult_digit__int(bn_digit_t *a, size_t a_count, bn_digit_t d) {
 	for (i = 0; i < a_count; i ++) {
 #if 1
 		t_hi = 0;
-		if (0 != a[i])
+		if (0 != a[i]) {
 			bn_digit_mult__int(d, a[i], &a[i], &t_hi);
+		}
 		a[i] += crr;
 		crr = ((a[i] < crr) ? 1 : 0);
 		crr += t_hi;
@@ -1529,8 +1566,9 @@ bn_digits_mult_digit__int(bn_digit_t *a, size_t a_count, bn_digit_t d) {
 		bn_digit_mult__int(d, t_lo, &t_lo, &t_hi);
 		crr += t_hi;
 		a[i] += t_lo;
-		if (a[i] < t_lo)
+		if (a[i] < t_lo) {
 			crr ++;
+		}
 #endif
 	}
 }
@@ -1559,8 +1597,9 @@ bn_digits_add_digit_mult__int(bn_digit_t *a, size_t a_count, bn_digit_t *b,
 		crr = ((a[i] < crr) ? 1 : 0);
 		crr += t_hi;
 		a[i] += t_lo;
-		if (a[i] < t_lo)
+		if (a[i] < t_lo) {
 			crr ++;
+		}
 #else
 		t_lo = b[i]; /* If a == b */
 		a[i] += crr;
@@ -1570,12 +1609,14 @@ bn_digits_add_digit_mult__int(bn_digit_t *a, size_t a_count, bn_digit_t *b,
 		bn_digit_mult__int(d, t_lo, &t_lo, &t_hi);
 		crr += t_hi;
 		a[i] += t_lo;
-		if (a[i] < t_lo)
+		if (a[i] < t_lo) {
 			crr ++;
+		}
 #endif
 	}
-	if (0 != crr && a_count > b_count)
+	if (0 != crr && a_count > b_count) {
 		bn_digits_add_digit(&a[b_count], (a_count - b_count), crr, NULL);
+	}
 }
 
 /* Computes: a -= b*d, where d is a digit. Returns borrow. */
@@ -1596,14 +1637,16 @@ bn_digits_sub_digit_mult__int(bn_digit_t *a, size_t a_count, bn_digit_t *b,
 #if 0
 		t_lo = 0;
 		t_hi = 0;
-		if (0 != b[i])
+		if (0 != b[i]) {
 			bn_digit_mult__int(d, b[i], &t_lo, &t_hi); /* If a == b */
+		}
 		a[i] -= brrw;
 		brrw = ((a[i] > (BN_MAX_DIGIT - brrw)) ? 1 : 0);
 		brrw += t_hi;
 		a[i] -= t_lo;
-		if (a[i] > (BN_MAX_DIGIT - t_lo))
+		if (a[i] > (BN_MAX_DIGIT - t_lo)) {
 			brrw ++;
+		}
 #else
 		t_lo = b[i]; /* If a == b */
 		a[i] -= brrw;
@@ -1613,8 +1656,9 @@ bn_digits_sub_digit_mult__int(bn_digit_t *a, size_t a_count, bn_digit_t *b,
 		bn_digit_mult__int(d, t_lo, &t_lo, &t_hi);
 		brrw += t_hi;
 		a[i] -= t_lo;
-		if (a[i] > (BN_MAX_DIGIT - t_lo))
+		if (a[i] > (BN_MAX_DIGIT - t_lo)) {
 			brrw ++;
+		}
 #endif
 	}
 	if (0 != brrw && a_count > b_count) {
@@ -1678,10 +1722,12 @@ bn_init_digits__int(bn_p bn, size_t digit_off) {
 	//digit_off += 4;
 	if (digit_off <= bn->digits)
 		return;
-	if (digit_off > bn->count)
+	if (digit_off > bn->count) {
 		digit_off = bn->count;
-	for (i = bn->digits; i < digit_off; i ++)
+	}
+	for (i = bn->digits; i < digit_off; i ++) {
 		bn->num[i] = 0;
+	}
 }
 /* Updates internal bn info: digits count. digit_off - updated digit offset. */
 static inline void
@@ -1751,9 +1797,10 @@ bn_is_pow2(bn_p bn) {
 		return (0);
 	if (0 == bn_digit_is_pow2(bn->num[(bn->digits - 1)]))
 		return (0);
-	for (i = 0; i < (bn->digits - 1); i ++)
+	for (i = 0; i < (bn->digits - 1); i ++) {
 		if (0 != bn->num[i])
 			return (0);
+	}
 	return (1);
 }
 
@@ -1783,7 +1830,7 @@ bn_is_equal(bn_p a, bn_p b) {
 	return (0 == bn_cmp(a, b));
 }
 
-/* Test whether the 'bits' bit in bn is one */
+/* Test_ whether the 'bits' bit in bn is one */
 static inline int
 bn_is_bit_set(bn_p bn, size_t bit) {
 
@@ -1806,10 +1853,11 @@ bn_bit_set(bn_p bn, size_t bit, int val) {
 	if (bn->count <= idx)
 		return (EOVERFLOW);
 	bn_init_digits__int(bn, (idx + 1));
-	if (0 == val) /* Clear bit. */
+	if (0 == val) { /* Clear bit. */
 		bn->num[idx] &= ~(((bn_digit_t)1) << (bit % BN_DIGIT_BITS));
-	else
+	} else {
 		bn->num[idx] |= (((bn_digit_t)1) << (bit % BN_DIGIT_BITS));
+	}
 	bn_update_digits__int(bn, (idx + 1));
 	return (0);
 }
@@ -1829,7 +1877,7 @@ bn_is_odd(bn_p bn) {
 /*------------------------- Conversion functions -----------------------------*/
 /* Import big-endian bun num. Reverse bytes copy (H->L). */
 static inline int
-bn_import_be_bin(bn_p bn, uint8_t *buf, size_t buf_size) {
+bn_import_be_bin(bn_p bn, const uint8_t *buf, size_t buf_size) {
 	size_t digits;
 
 	BN_POINTER_CHK_EINVAL(bn);
@@ -1852,7 +1900,7 @@ bn_export_be_bin(bn_p bn, uint32_t flags, uint8_t *buf, size_t buf_size,
 
 /* Import little-endian bin num / Normal copy (L->H). */
 static inline int
-bn_import_le_bin(bn_p bn, uint8_t *buf, size_t buf_size) {
+bn_import_le_bin(bn_p bn, const uint8_t *buf, size_t buf_size) {
 	size_t digits;
 
 	BN_POINTER_CHK_EINVAL(bn);
@@ -1874,7 +1922,7 @@ bn_export_le_bin(bn_p bn, uint32_t flags, uint8_t *buf, size_t buf_size,
 
 /* Import from little-endian hex string (L->H). */
 static inline int
-bn_import_le_hex(bn_p bn, uint8_t *buf, size_t buf_size) {
+bn_import_le_hex(bn_p bn, const uint8_t *buf, size_t buf_size) {
 
 	BN_POINTER_CHK_EINVAL(bn);
 	BN_PREFETCH_BN_DATA(bn);
@@ -1896,7 +1944,7 @@ bn_export_le_hex(bn_p bn, uint32_t flags, uint8_t *buf, size_t buf_size,
 
 /* Import from big-endian hex string (H->L). */
 static inline int
-bn_import_be_hex(bn_p bn, uint8_t *buf, size_t buf_size) {
+bn_import_be_hex(bn_p bn, const uint8_t *buf, size_t buf_size) {
 
 	BN_POINTER_CHK_EINVAL(bn);
 	BN_PREFETCH_BN_DATA(bn);
@@ -2021,9 +2069,12 @@ bn_and(bn_p bn, bn_p n) {
 	BN_PREFETCH_BN_DATA(bn);
 	BN_PREFETCH_BN_DATA(n);
 	digits = min(bn->digits, n->digits);
-	for (i = 0; i < digits; i ++)
+	for (i = 0; i < digits; i ++) {
 		bn->num[i] &= n->num[i];
-	bn->num[digits] = 0;
+	}
+	if (bn->count > digits) {
+		bn->num[digits] = 0;
+	}
 	bn_update_digits__int(bn, digits);
 	return (0);
 }
@@ -2041,8 +2092,9 @@ bn_or(bn_p bn, bn_p n) {
 	BN_PREFETCH_BN_DATA(n);
 	digits = max(bn->digits, n->digits);
 	bn_init_digits__int(bn, digits);
-	for (i = 0; i < n->digits; i ++)
+	for (i = 0; i < n->digits; i ++) {
 		bn->num[i] |= n->num[i];
+	}
 	bn_update_digits__int(bn, digits);
 	return (0);
 }
@@ -2060,8 +2112,9 @@ bn_xor(bn_p bn, bn_p n) {
 	BN_PREFETCH_BN_DATA(n);
 	digits = max(bn->digits, n->digits);
 	bn_init_digits__int(bn, digits);
-	for (i = 0; i < n->digits; i ++)
+	for (i = 0; i < n->digits; i ++) {
 		bn->num[i] ^= n->num[i];
+	}
 	bn_update_digits__int(bn, digits);
 	return (0);
 }
@@ -2101,8 +2154,9 @@ bn_sub_digit(bn_p bn, bn_digit_t n, bn_digit_t *borrow) {
 	if (NULL == bn || 0 == n)
 		return;
 	digits = bn->digits;
-	if (0 == digits || (1 == digits && bn->num[0] < n))
+	if (0 == digits || (1 == digits && bn->num[0] < n)) {
 		digits = bn->count;
+	}
 	bn_init_digits__int(bn, digits);
 	bn_digits_sub_digit(bn->num, bn->count, n, borrow);
 	bn_update_digits__int(bn, digits);
@@ -2116,13 +2170,15 @@ bn_sub(bn_p bn, bn_p n, bn_digit_t *borrow) {
 	BN_POINTER_CHK_EINVAL(n);
 	if (bn == n) {
 		bn_assign_zero(bn);
-		if (NULL != borrow)
+		if (NULL != borrow) {
 			(*borrow) = 0;
+		}
 	}
 	digits = bn->digits;
 	if (digits < n->digits ||
-	    (digits == n->digits && bn->num[digits] <= n->num[digits]))
+	    (digits == n->digits && bn->num[(digits - 1)] <= n->num[(digits - 1)])) {
 		digits = bn->count;
+	}
 	bn_init_digits__int(bn, digits);
 	BN_RET_ON_ERR(bn_digits_sub(bn->num, bn->count,
 	    n->num, n->digits, borrow));
@@ -2194,23 +2250,20 @@ bn_mult_digit(bn_p bn, bn_digit_t n) {
 	/* Speed optimizations. */
 	if (0 != bn_is_zero(bn))
 		return (0);
+
 	switch (n) {
 	case 0:
 		bn_assign_zero(bn);
-		return (0);
 		break;
 	case 1:
-		return (0);
 		break;
-	case 2:// XXX shift check
+	case 2: // XXX shift check
 		BN_RET_ON_ERR(bn_add(bn, bn, NULL));
-		return (0);
 		break;
 	case 3:
 		BN_RET_ON_ERR(bn_assign_init(&tmp, bn));
 		BN_RET_ON_ERR(bn_add(&tmp, &tmp, NULL));
 		BN_RET_ON_ERR(bn_add(bn, &tmp, NULL));
-		return (0);
 		break;
 	default:
 		digits = bn->digits;
@@ -2221,7 +2274,6 @@ bn_mult_digit(bn_p bn, bn_digit_t n) {
 		bn_init_digits__int(bn, digits);
 		bn_digits_mult_digit__int(bn->num, digits, n);
 		bn_update_digits__int(bn, digits);
-		return (0);
 		break;
 	}
 	return (0);
@@ -2267,8 +2319,9 @@ bn_exp_digit(bn_p bn, bn_digit_t exp) {
 	BN_RET_ON_ERR(bn_assign_init(&base, bn));
 	BN_RET_ON_ERR(bn_assign_digit(bn, 1));
 	for (; 0 != exp; exp >>= 1) {
-		if (0 != (exp & 1))
+		if (0 != (exp & 1)) {
 			BN_RET_ON_ERR(bn_mult(bn, &base));
+		}
 		BN_RET_ON_ERR(bn_mult(&base, &base));
 	}
 	return (0);
@@ -2295,8 +2348,9 @@ bn_div(bn_p bn, bn_p d, bn_p remainder) {
 #if 0
 	/* Speed optimizations. */
 	if (0 != bn_is_zero(bn)) { /* 0 / divisor, return 0. */
-		if (bn != remainder)
+		if (bn != remainder) {
 			bn_assign_zero(remainder);
+		}
 		return (0);
 	}
 	if (0 != bn_is_one(d)) { /* dividend / 1, return dividend. */
@@ -2312,22 +2366,25 @@ bn_div(bn_p bn, bn_p d, bn_p remainder) {
 			BN_RET_ON_ERR(bn_assign(remainder, bn));
 			BN_RET_ON_ERR(bn_and(remainder, nn));
 		}
-		if (bn != remainder)
+		if (bn != remainder) {
 			bn_r_shift(bn, shift);
+		}
 		return (0);
 	}
 #endif
 	switch (bn_cmp(bn, d)) {
 	case 0: /* n = d */
 n_eq_d:
-		if (bn != remainder)
+		if (bn != remainder) {
 			bn_assign_digit(bn, 1);
+		}
 		bn_assign_zero(remainder);
 		return (0);
 	case -1: /* n < d */
 		if (bn != remainder) {
-			if (NULL != remainder)
+			if (NULL != remainder) {
 				error = bn_assign(remainder, bn);
+			}
 			bn_assign_zero(bn);
 		}
 		return (error);
@@ -2347,34 +2404,35 @@ n_eq_d:
 	/* Calculation. */
 	bn_assign_zero(bn);
 	//bn_init_digits__int(bn, (1 + nn->digits - dd->digits));
-	for (j = (nn->digits - dd->digits); j >= 0; j --) {
+	for (j = (ssize_t)(nn->digits - dd->digits); j >= 0; j --) {
 		/* Underestimate quotient digit and subtract. */
-		if (nn->count == (j + dd->digits)) {
+		if (nn->count == ((size_t)j + dd->digits)) {
 			if (t == BN_MAX_DIGIT) {
 				ai = 0;
 			} else {
 				/*BN_RET_ON_ERR(bn_digit_div__int_short(
 				    nn->num[(j + dd->digits - 1)], 0, (t + 1), &ai));*/
-				ai = (nn->num[(j + dd->digits - 1)] / (t + 1));
+				ai = (nn->num[((size_t)j + dd->digits - 1)] / (t + 1));
 			}
 		} else {
 			if (t == BN_MAX_DIGIT) {
-				ai = nn->num[(j + dd->digits)];
+				ai = nn->num[((size_t)j + dd->digits)];
 			} else {
 				BN_RET_ON_ERR(bn_digit_div__int_short(
-				    nn->num[(j + dd->digits - 1)],
-				    nn->num[(j + dd->digits)], (t + 1), &ai));
+				    nn->num[((size_t)j + dd->digits - 1)],
+				    nn->num[((size_t)j + dd->digits)], (t + 1), &ai));
 			}
 		}
-		if (0 != ai)
-			bn_digits_sub_digit_mult__int(&nn->num[j], (nn->digits - j),
+		if (0 != ai) {
+			bn_digits_sub_digit_mult__int(&nn->num[j], (size_t)(nn->digits - (size_t)j),
 			    dd->num, dd->digits, ai, NULL);
+		}
 		/* Correct estimate. */
-		while ((nn->count > (j + dd->digits) && 
-		    0 != nn->num[(j + dd->digits)]) ||
+		while ((nn->count > ((size_t)j + dd->digits) && 
+		    0 != nn->num[((size_t)j + dd->digits)]) ||
 		    bn_digits_cmp(&nn->num[j], dd->num, dd->digits) >= 0) {
 			ai ++;
-			bn_digits_sub__int(&nn->num[j], (nn->digits - j),
+			bn_digits_sub__int(&nn->num[j], (size_t)(nn->digits - (size_t)j),
 			    dd->num, dd->digits, NULL);
 		}
 		bn->num[j] = ai;
@@ -2467,8 +2525,9 @@ bn_gcd_bin(bn_p bn, bn_p a, bn_p b) {
 		bn_r_shift(tb, shift_b);
 		/* Now a and b are both odd. Swap if necessary so a <= b,
 		 * then set b -= a (which is even). */
-		if (bn_cmp(ta, tb) > 0)
+		if (bn_cmp(ta, tb) > 0) {
 			bn_swap_ptr(ta, tb);
+		}
 		BN_RET_ON_ERR(bn_sub(tb, ta, NULL)); /* Here b >= a. */
 		shift_b = bn_ctz(tb);
 	}
@@ -2583,8 +2642,9 @@ bn_sqrt1(bn_p bn) {
 	BN_RET_ON_ERR(bn_init(&bit, bits));
 	BN_RET_ON_ERR(bn_init(&tmp, bits));
 	BN_RET_ON_ERR(bn_assign_2exp(&bit, (bits - bn_clz(bn))));
-	while (bn_cmp(&bit, bn) > 0)
+	while (bn_cmp(&bit, bn) > 0) {
 		bn_r_shift(&bit, 2);
+	}
 
 	while (0 == bn_is_zero(&bit)) {
 		BN_RET_ON_ERR(bn_assign(&tmp, &res));
@@ -2621,8 +2681,9 @@ bn_sqrt2(bn_p bn) {
 	BN_RET_ON_ERR(bn_init(&bit, bits));
 	BN_RET_ON_ERR(bn_init(&tmp, bits));
 	BN_RET_ON_ERR(bn_assign_2exp(&bit, (bits - bn_clz(bn))));
-	while (bn_cmp(&bit, bn) > 0)
+	while (bn_cmp(&bit, bn) > 0) {
 		bn_r_shift(&bit, 2);
+	}
 
 	while (0 == bn_is_zero(&bit)) {
 		BN_RET_ON_ERR(bn_assign(&tmp, &res));
@@ -2648,18 +2709,18 @@ bn_sqrt3(bn_p bn) {
 
 	BN_POINTER_CHK_EINVAL(bn);
 	bits = (bn->count * BN_DIGIT_BITS);
-	bit = (bits - bn_clz(bn));
-	bit &= ~1;
+	bit = (ssize_t)(bits - bn_clz(bn));
+	bit &= ~((size_t)1);
 	BN_RET_ON_ERR(bn_init(&res, bits));
 	BN_RET_ON_ERR(bn_init(&tmp, bits));
 
 	while (bit >= 0) {
 		BN_RET_ON_ERR(bn_assign(&tmp, &res));
-		BN_RET_ON_ERR(bn_bit_set(&tmp, bit, 1));
+		BN_RET_ON_ERR(bn_bit_set(&tmp, (size_t)bit, 1));
 		bn_r_shift(&res, 1);
 		if (bn_cmp(bn, &tmp) >= 0) {
 			BN_RET_ON_ERR(bn_sub(bn, &tmp, NULL));
-			BN_RET_ON_ERR(bn_bit_set(&res, bit, 1));
+			BN_RET_ON_ERR(bn_bit_set(&res, (size_t)bit, 1));
 		}
 		bit -= 2;
 	}
@@ -2680,10 +2741,12 @@ bn_sqrt4(bn_p bn) {/* broken? */
 
 	for (i = 0; i < bits; i ++) {
 		bn_l_shift(&rem, 2);
-		if (0 != bn_is_bit_set(bn, (i * 2)))
+		if (0 != bn_is_bit_set(bn, (i * 2))) {
 			BN_RET_ON_ERR(bn_bit_set(&rem, 0, 1));
-		if (0 != bn_is_bit_set(bn, ((i * 2) + 1)))
+		}
+		if (0 != bn_is_bit_set(bn, ((i * 2) + 1))) {
 			BN_RET_ON_ERR(bn_bit_set(&rem, 1, 1));
+		}
 		bn_l_shift(&root, 1);
 		if (bn_cmp(&root, &rem) < 0) {
 			BN_RET_ON_ERR(bn_bit_set(&root, 0, 1)); /* ++ */
@@ -2698,7 +2761,7 @@ bn_sqrt4(bn_p bn) {/* broken? */
 
 static inline int
 bn_sqrt5(bn_p bn) {
-	ssize_t bits;
+	size_t bits;
 	bn_t res, tmp;
 
 	BN_POINTER_CHK_EINVAL(bn);
@@ -2707,12 +2770,15 @@ bn_sqrt5(bn_p bn) {
 	BN_RET_ON_ERR(bn_init(&res, (bn->count * BN_DIGIT_BITS)));
 	BN_RET_ON_ERR(bn_assign_2exp(&res, bits));
 
-	for (; 0 <= bits; bits --) {
+	for (;; bits --) {
 		BN_RET_ON_ERR(bn_bit_set(&res, bits, 1)); /* Set bit.*/
 		BN_RET_ON_ERR(bn_assign(&tmp, &res));
 		BN_RET_ON_ERR(bn_square(&tmp));
-		if (bn_cmp(&tmp, bn) > 0)
+		if (bn_cmp(&tmp, bn) > 0) {
 			BN_RET_ON_ERR(bn_bit_set(&res, bits, 0)); /* Unset bit.*/
+		}
+		if (0 == bits)
+			break;
 	}
 	BN_RET_ON_ERR(bn_assign(bn, &res));
 	return (0);
@@ -2733,8 +2799,9 @@ bn_combo_column_get(bn_p bn, size_t bit_off, size_t wnd_bits, size_t wnd_count) 
 		res <<= 1;
 		//if (0 != bn_is_bit_set(bn, off))
 		if (bits_cnt > off &&
-		    0 != (bn->num[(off / BN_DIGIT_BITS)] & (((bn_digit_t)1) << (off % BN_DIGIT_BITS))))
+		    0 != (bn->num[(off / BN_DIGIT_BITS)] & (((bn_digit_t)1) << (off % BN_DIGIT_BITS)))) {
 			res |= 1;
+		}
 	}
 	return (res);
 }
@@ -2758,30 +2825,34 @@ bn_calc_jsf(bn_p a, bn_p b, size_t jsf_arr_size,
 
 	while ((0 == bn_is_zero(&tmA) || 0 != d0) ||
 	    (0 == bn_is_zero(&tmB) || 0 != d1)) {
-		l0 = (tmA.num[0] + d0) & 0x7; /* mod 8. */
-		l1 = (tmB.num[0] + d1) & 0x7;
+		l0 = (((int8_t)tmA.num[0] + d0) & 0x7); /* mod 8. */
+		l1 = (((int8_t)tmB.num[0] + d1) & 0x7);
 
 		if (0 != bn_digit_is_even(l0)) {
 			itm = 0;
 		} else {
 			itm = (2 - (l0 & 0x3));
-			if ((3 == l0 || 5 == l0) && (2 == (l1 & 0x3)))
+			if ((3 == l0 || 5 == l0) && (2 == (l1 & 0x3))) {
 				itm = - itm;
+			}
 		}
 		jsf_arr[i] = itm;
-		if ((2 * d0) == (1 + itm))
+		if ((2 * d0) == (1 + itm)) {
 			d0 = (int8_t)(1 - d0);
+		}
 
 		if (0 != bn_digit_is_even(l1)) {
 			itm = 0;
 		} else {
 			itm = (2 - (l1 & 0x3));
-			if ((3 == l1 || 5 == l1) && (2 == (l0 & 0x3)))
+			if ((3 == l1 || 5 == l1) && (2 == (l0 & 0x3))) {
 				itm = - itm;
+			}
 		}
 		jsf_arr[(i + offset)] = itm;
-		if ((2 * d1) == (1 + itm))
+		if ((2 * d1) == (1 + itm)) {
 			d1 = (int8_t)(1 - d1);
+		}
 
 		i ++;
 		bn_r_shift(&tmA, 1); // >> 1
@@ -2810,16 +2881,17 @@ bn_calc_naf(bn_p bn, size_t wnd_bits, size_t naf_arr_size, int8_t *naf_arr,
 	if (naf_arr_size < (bn_calc_bits(bn) + 1))
 		return (EOVERFLOW);
 	mask = ((((bn_digit_t)1) << wnd_bits) - 1);
-	sign_bit = (((uint8_t)1) << (wnd_bits - 1));
+	sign_bit = (uint8_t)(((uint8_t)1) << (wnd_bits - 1));
 	BN_RET_ON_ERR(bn_assign_init(&tm, bn));
 
 	while (0 == bn_is_zero(&tm)) {
 		if (0 != (tm.num[0] & 1)) { /* Is odd? */
 			/* Get wnd_bits bits, convert to +-(wnd_bits/2). */
 #if 1
-			itm = (tm.num[0] & mask);
-			if (0 != (sign_bit & itm))
+			itm = (int8_t)(tm.num[0] & mask);
+			if (0 != (sign_bit & itm)) {
 				itm -= (sign_bit * 2);
+			}
 #else /* Original from 3.30 and 3.35 */
 			if (2 == wnd_bits) {
 				itm = (2 - (tm.num[0] & mask));
@@ -2830,8 +2902,9 @@ bn_calc_naf(bn_p bn, size_t wnd_bits, size_t naf_arr_size, int8_t *naf_arr,
 				 */
 			} else {
 				itm = (tm.num[0] & mask);
-				if (sign_bit < itm)
+				if (sign_bit < itm) {
 					itm -= (sign_bit * 2);
+				}
 				/* 0:  0
 				 * 1:  1
 				 * 2:  0
@@ -2940,8 +3013,9 @@ bn_mod(bn_p bn, bn_p m, bn_mod_rd_data_p mod_rd_data) {
 	}
 	BN_RET_ON_ERR(bn_sub(&r, &q, NULL));
 	r.digits = m->digits;
-	while (bn_cmp(&r, m) >= 0)
+	while (bn_cmp(&r, m) >= 0) {
 		BN_RET_ON_ERR(bn_sub(&r, m, NULL));
+	}
 	BN_RET_ON_ERR(bn_assign(bn, &r));
 #endif /* BN_MOD_REDUCE_ALGO */
 
@@ -2983,8 +3057,9 @@ bn_mod_add(bn_p bn, bn_p n, bn_p m, bn_mod_rd_data_p mod_rd_data __unused) {
 	BN_POINTER_CHK_EINVAL(n);
 	BN_POINTER_CHK_EINVAL(m);
 	BN_RET_ON_ERR(bn_add(bn, n, NULL));
-	if (bn_cmp(bn, m) >= 0) /* bn >= m */
+	if (bn_cmp(bn, m) >= 0) { /* bn >= m */
 		BN_RET_ON_ERR(bn_sub(bn, m, NULL));
+	}
 	//BN_RET_ON_ERR(bn_mod(bn, m, mod_rd_data));
 	return (0);
 }
@@ -2996,8 +3071,9 @@ bn_mod_sub(bn_p bn, bn_p n, bn_p m, bn_mod_rd_data_p mod_rd_data) {
 	BN_POINTER_CHK_EINVAL(bn);
 	BN_POINTER_CHK_EINVAL(n);
 	BN_POINTER_CHK_EINVAL(m);
-	if (bn_cmp(bn, n) < 0) /* bn < n */
+	if (bn_cmp(bn, n) < 0) { /* bn < n */
 		BN_RET_ON_ERR(bn_add(bn, m, NULL));
+	}
 	BN_RET_ON_ERR(bn_sub(bn, n, NULL));
 	BN_RET_ON_ERR(bn_mod(bn, m, mod_rd_data));
 	return (0);
@@ -3070,8 +3146,9 @@ bn_mod_exp_digit(bn_p bn, size_t exp, bn_p m, bn_mod_rd_data_p mod_rd_data) {
 	BN_RET_ON_ERR(bn_assign_init(&base, bn));
 	BN_RET_ON_ERR(bn_assign_digit(bn, 1));
 	for (; 0 != exp; exp >>= 1) {
-		if (0 != (exp & 1))
+		if (0 != (exp & 1)) {
 			BN_RET_ON_ERR(bn_mod_mult(bn, &base, m, mod_rd_data));
+		}
 		BN_RET_ON_ERR(bn_mod_mult(&base, &base, m, mod_rd_data));
 	}
 	return (0);
@@ -3121,8 +3198,9 @@ bn_mod_exp(bn_p bn, bn_p exp, bn_p m, bn_mod_rd_data_p mod_rd_data) {
 	BN_PREFETCH_BN_DATA(exp);
 	bits = bn_calc_bits(exp);
 	for (i = 0; i < bits; i ++) {
-		if (0 != bn_is_bit_set(exp, i))
+		if (0 != bn_is_bit_set(exp, i)) {
 			BN_RET_ON_ERR(bn_mod_mult(bn, &base, m, mod_rd_data));
+		}
 		BN_RET_ON_ERR(bn_mod_mult(&base, &base, m, mod_rd_data));
 	}
 	return (0);
@@ -3226,8 +3304,9 @@ bn_mod_inv2(bn_p bn, bn_p m, bn_mod_rd_data_p mod_rd_data) {
 
 	/* если u = 1, то d2 - число, обратное bn в кольце вычетов по модулю m
 	иначе - обратного элемента не сущетсвует */
-	if (pd2 != bn)
+	if (pd2 != bn) {
 		BN_RET_ON_ERR(bn_assign(bn, pd2));
+	}
 	return (0);
 }
 
@@ -3273,14 +3352,16 @@ bn_mod_inv_bin(bn_p bn, bn_p m, bn_mod_rd_data_p mod_rd_data) {
 	while (0 == bn_is_one(&u) && 0 == bn_is_one(&v)) {
 		while (0 != bn_is_even(&u)) { /* Zero bit check. */
 			bn_r_shift(&u, 1);
-			if (0 == bn_is_even(&x1))
+			if (0 == bn_is_even(&x1)) {
 				BN_RET_ON_ERR(bn_add(&x1, m, NULL));
+			}
 			bn_r_shift(&x1, 1);
 		}
 		while (0 != bn_is_even(&v)) {
 			bn_r_shift(&v, 1);
-			if (0 == bn_is_even(&x2))
+			if (0 == bn_is_even(&x2)) {
 				BN_RET_ON_ERR(bn_add(&x2, m, NULL));
+			}
 			bn_r_shift(&x2, 1);
 		}
 		if (bn_cmp(&u, &v) >= 0) {
@@ -3325,31 +3406,37 @@ bn_mod_div_mont(bn_p bn, bn_p d, bn_p m, bn_mod_rd_data_p mod_rd_data __unused) 
 	while ((cmp_res = bn_cmp(&a, &b)) != 0) {
 		if (0 != bn_is_even(&a)) {
 			bn_r_shift(&a, 1);
-			if (0 == bn_is_even(bn))
+			if (0 == bn_is_even(bn)) {
 				BN_RET_ON_ERR(bn_add(bn, m, NULL));
+			}
 			bn_r_shift(bn, 1);
 		} else if (0 != bn_is_even(&b)) {
 			bn_r_shift(&b, 1);
-			if (0 == bn_is_even(&v))
+			if (0 == bn_is_even(&v)) {
 				BN_RET_ON_ERR(bn_add(&v, m, NULL));
+			}
 			bn_r_shift(&v, 1);
 		} else if (cmp_res > 0) {
 			BN_RET_ON_ERR(bn_sub(&a, &b, NULL));
 			bn_r_shift(&a, 1);
-			if (bn_cmp(bn, &v) < 0)
+			if (bn_cmp(bn, &v) < 0) {
 				BN_RET_ON_ERR(bn_add(bn, m, NULL));
+			}
 			BN_RET_ON_ERR(bn_sub(bn, &v, NULL));
-			if (0 == bn_is_even(bn))
+			if (0 == bn_is_even(bn)) {
 				BN_RET_ON_ERR(bn_add(bn, m, NULL));
+			}
 			bn_r_shift(bn, 1);
 		} else {
 			BN_RET_ON_ERR(bn_sub(&b, &a, NULL));
 			bn_r_shift(&b, 1);
-			if (bn_cmp(&v, bn) < 0)
+			if (bn_cmp(&v, bn) < 0) {
 				BN_RET_ON_ERR(bn_add(&v, m, NULL));
+			}
 			BN_RET_ON_ERR(bn_sub(&v, bn, NULL));
-			if (0 == bn_is_even(&v))
+			if (0 == bn_is_even(&v)) {
 				BN_RET_ON_ERR(bn_add(&v, m, NULL));
+			}
 			bn_r_shift(&v, 1);
 		}
 	}
@@ -3406,8 +3493,9 @@ bn_mod_small(bn_p bn, bn_p m, bn_mod_rd_data_p mod_rd_data __unused) {
 	BN_POINTER_CHK_EINVAL(bn);
 	BN_POINTER_CHK_EINVAL(m);
 
-	while (bn_cmp(bn, m) > 0)
+	while (bn_cmp(bn, m) > 0) {
 		BN_RET_ON_ERR(bn_sub(bn, m, NULL));
+	}
 
 	return (0);
 }
@@ -3470,7 +3558,7 @@ bn_mod_sqrt(bn_p bn, bn_p m, bn_mod_rd_data_p mod_rd_data) {
 	} else if (5 == (m->num[0] & 7)) { /* Is m mod 8 == 5? */
 		/* tm = (2 * bn)^((m - 5) / 8) mod m */
 		BN_RET_ON_ERR(bn_assign_init(&tm2, m));
-		//bn_sub_digit(&tm2, 5, NULL); /* m - 5: skeeped, next shifting do same. */
+		//bn_sub_digit(&tm2, 5, NULL); /* m - 5: skiped, next shifting do same. */
 		bn_r_shift(&tm2, 3); /* (m - 5) / 8 */
 		BN_RET_ON_ERR(bn_assign_init(&tm, bn));
 		BN_RET_ON_ERR(bn_mod_mult_digit(&tm, 2, m, mod_rd_data));
@@ -3535,8 +3623,9 @@ bn_mod_sqrt(bn_p bn, bn_p m, bn_mod_rd_data_p mod_rd_data) {
 			BN_RET_ON_ERR(bn_mod_exp(&t, &tm, m, mod_rd_data)); /* t = ((bn ^ 2) * bn_inv) ^ tm */
 			/* If t-(-1) mod m == 0, since t < m then 
 			 * we can use (m - 1) == t instead */
-			if (0 == bn_cmp(&t, &tm2)) /* Set bn = bn * b mod m */
+			if (0 == bn_cmp(&t, &tm2)) { /* Set bn = bn * b mod m */
 				BN_RET_ON_ERR(bn_mod_mult(bn, &b, m, mod_rd_data));
+			}
 			BN_RET_ON_ERR(bn_mod_square(&b, m, mod_rd_data)); /* b = b^2 mod m */
 		}
 	} else {
@@ -3556,15 +3645,15 @@ bn_mod_sqrt(bn_p bn, bn_p m, bn_mod_rd_data_p mod_rd_data) {
 #ifdef BN_SELF_TEST
 
 static inline int
-bn_self_test() {
+bn_self_test(void) {
 	size_t j;
 	bn_digit_t da, db;
 	bn_t a, b, q, r, bn;
-	/*  Welschenbach M., 4.3 Division with Remainder, Test values. */
-	uint8_t *div_a = (uint8_t*)"e37d3abc904baba7a2ac4b6d8f782b2bf84919d2917347690d9e93dcdd2b91cee9983c564cf1312206c91e74d80ba479064c8f42bd70aaaa689f80d435afc997ce853b465703c8edca";
-	uint8_t *div_b = (uint8_t*)"080b0987b72c1667c30c9156a6674c2e73e61a1fd527d4e78b3f1505603c566658459b83ccfd587ba9b5fcbdc0ad09152e0ac265";
-	uint8_t *div_q = (uint8_t*)"1c48a1c798541ae0b9eb2c6327b1fffff4fe5c0e2723";
-	uint8_t *div_r = (uint8_t*)"ca2312fbb3f4c23add7655e94c3410b15c6064bd48a4e5fcc33ddf553e7cb829bf66fbfd61b4667f5ed6b387ec47c5272cf6fb";
+	/*  Welschenbach M., 4.3 Division with Remainder, Test_ values. */
+	const uint8_t *div_a = (const uint8_t*)"e37d3abc904baba7a2ac4b6d8f782b2bf84919d2917347690d9e93dcdd2b91cee9983c564cf1312206c91e74d80ba479064c8f42bd70aaaa689f80d435afc997ce853b465703c8edca";
+	const uint8_t *div_b = (const uint8_t*)"080b0987b72c1667c30c9156a6674c2e73e61a1fd527d4e78b3f1505603c566658459b83ccfd587ba9b5fcbdc0ad09152e0ac265";
+	const uint8_t *div_q = (const uint8_t*)"1c48a1c798541ae0b9eb2c6327b1fffff4fe5c0e2723";
+	const uint8_t *div_r = (const uint8_t*)"ca2312fbb3f4c23add7655e94c3410b15c6064bd48a4e5fcc33ddf553e7cb829bf66fbfd61b4667f5ed6b387ec47c5272cf6fb";
 	//uint8_t buf[4096];
 
 	BN_RET_ON_ERR(bn_init(&bn, BN_BIT_LEN));
@@ -3592,10 +3681,10 @@ bn_self_test() {
 	BN_RET_ON_ERR(bn_init(&q, BN_BIT_LEN));
 	BN_RET_ON_ERR(bn_init(&r, BN_BIT_LEN));
 
-	BN_RET_ON_ERR(bn_import_be_hex(&a, div_a, strlen((char*)div_a)));
-	BN_RET_ON_ERR(bn_import_be_hex(&b, div_b, strlen((char*)div_b)));
-	BN_RET_ON_ERR(bn_import_be_hex(&q, div_q, strlen((char*)div_q)));
-	BN_RET_ON_ERR(bn_import_be_hex(&r, div_r, strlen((char*)div_r)));
+	BN_RET_ON_ERR(bn_import_be_hex(&a, div_a, strlen((const char*)div_a)));
+	BN_RET_ON_ERR(bn_import_be_hex(&b, div_b, strlen((const char*)div_b)));
+	BN_RET_ON_ERR(bn_import_be_hex(&q, div_q, strlen((const char*)div_q)));
+	BN_RET_ON_ERR(bn_import_be_hex(&r, div_r, strlen((const char*)div_r)));
 
 	/* bn = (b * q) + r */
 	BN_RET_ON_ERR(bn_assign(&bn, &b));
@@ -3608,11 +3697,11 @@ bn_self_test() {
 	BN_RET_ON_ERR(bn_assign(&q, &a));
 	BN_RET_ON_ERR(bn_div(&q, &b, &r));
 	//BN_RET_ON_ERR(bn_export_be_hex(&q, 0, buf, sizeof(buf), &j));
-	BN_RET_ON_ERR(bn_import_be_hex(&bn, div_q, strlen((char*)div_q)));
+	BN_RET_ON_ERR(bn_import_be_hex(&bn, div_q, strlen((const char*)div_q)));
 	if (0 != bn_cmp(&q, &bn))
 		return (1004);
 	//BN_RET_ON_ERR(bn_export_be_hex(&r, 0, buf, sizeof(buf), &j));
-	BN_RET_ON_ERR(bn_import_be_hex(&bn, div_r, strlen((char*)div_r)));
+	BN_RET_ON_ERR(bn_import_be_hex(&bn, div_r, strlen((const char*)div_r)));
 	if (0 != bn_cmp(&r, &bn))
 		return (1005);//*/
 	
@@ -3652,12 +3741,12 @@ bn_self_test() {
 #endif
 	
 	/* mod_inv */
-	uint8_t *mod_inv_m256 = (uint8_t*)"ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551";
-	uint8_t *mod_inv_k256 = (uint8_t*)"580ec00d856434334cef3f71ecaed4965b12ae37fa47055b1965c7b134ee45d0";
-	uint8_t *mod_inv_r256 = (uint8_t*)"6a664fa115356d33f16331b54c4e7ce967965386c7dcbf2904604d0c132b4a74";
-	BN_RET_ON_ERR(bn_import_be_hex(&q, mod_inv_m256, strlen((char*)mod_inv_m256)));
-	BN_RET_ON_ERR(bn_import_be_hex(&a, mod_inv_k256, strlen((char*)mod_inv_k256)));
-	BN_RET_ON_ERR(bn_import_be_hex(&r, mod_inv_r256, strlen((char*)mod_inv_r256)));
+	const uint8_t *mod_inv_m256 = (const uint8_t*)"ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551";
+	const uint8_t *mod_inv_k256 = (const uint8_t*)"580ec00d856434334cef3f71ecaed4965b12ae37fa47055b1965c7b134ee45d0";
+	const uint8_t *mod_inv_r256 = (const uint8_t*)"6a664fa115356d33f16331b54c4e7ce967965386c7dcbf2904604d0c132b4a74";
+	BN_RET_ON_ERR(bn_import_be_hex(&q, mod_inv_m256, strlen((const char*)mod_inv_m256)));
+	BN_RET_ON_ERR(bn_import_be_hex(&a, mod_inv_k256, strlen((const char*)mod_inv_k256)));
+	BN_RET_ON_ERR(bn_import_be_hex(&r, mod_inv_r256, strlen((const char*)mod_inv_r256)));
 	
 	BN_RET_ON_ERR(bn_assign(&bn, &a));
 	BN_RET_ON_ERR(bn_mod_inv1(&bn, &q, NULL));
@@ -3679,12 +3768,12 @@ bn_self_test() {
 		return (1023);
 
 	
-	uint8_t *mod_inv_m384 = (uint8_t*)"ffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52973";
-	uint8_t *mod_inv_k384 = (uint8_t*)"dc6b44036989a196e39d1cdac000812f4bdd8b2db41bb33af51372585ebd1db63f0ce8275aa1fd45e2d2a735f8749359";
-	uint8_t *mod_inv_r384 = (uint8_t*)"7436f03088e65c37ba8e7b33887fbc87757514d611f7d1fbdf6d2104a297ad318cdbf7404e4ba37e599666df37b8d8be";
-	BN_RET_ON_ERR(bn_import_be_hex(&q, mod_inv_m384, strlen((char*)mod_inv_m384)));
-	BN_RET_ON_ERR(bn_import_be_hex(&a, mod_inv_k384, strlen((char*)mod_inv_k384)));
-	BN_RET_ON_ERR(bn_import_be_hex(&r, mod_inv_r384, strlen((char*)mod_inv_r384)));
+	const uint8_t *mod_inv_m384 = (const uint8_t*)"ffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52973";
+	const uint8_t *mod_inv_k384 = (const uint8_t*)"dc6b44036989a196e39d1cdac000812f4bdd8b2db41bb33af51372585ebd1db63f0ce8275aa1fd45e2d2a735f8749359";
+	const uint8_t *mod_inv_r384 = (const uint8_t*)"7436f03088e65c37ba8e7b33887fbc87757514d611f7d1fbdf6d2104a297ad318cdbf7404e4ba37e599666df37b8d8be";
+	BN_RET_ON_ERR(bn_import_be_hex(&q, mod_inv_m384, strlen((const char*)mod_inv_m384)));
+	BN_RET_ON_ERR(bn_import_be_hex(&a, mod_inv_k384, strlen((const char*)mod_inv_k384)));
+	BN_RET_ON_ERR(bn_import_be_hex(&r, mod_inv_r384, strlen((const char*)mod_inv_r384)));
 
 	BN_RET_ON_ERR(bn_assign(&bn, &a));
 	BN_RET_ON_ERR(bn_mod_inv1(&bn, &q, NULL));
@@ -3727,7 +3816,7 @@ bn_self_test() {
 
 
 
-#if 0 /* Unused code  */
+#if 0 /* Unused code */
 
 
 /* Return shift for b untill a>=b */
@@ -3762,8 +3851,9 @@ bn_div(bn_p bn, bn_p d, bn_p remainder) {
 #if 0
 	/* Speed optimizations. */
 	if (0 != bn_is_zero(bn)) { /* 0 / divisor, return 0. */
-		if (bn != remainder)
+		if (bn != remainder) {
 			bn_assign_zero(remainder);
+		}
 		return (0);
 	}
 	if (0 != bn_is_one(d)) { /* dividend / 1, return dividend. */
@@ -3779,22 +3869,25 @@ bn_div(bn_p bn, bn_p d, bn_p remainder) {
 			BN_RET_ON_ERR(bn_assign(remainder, bn));
 			BN_RET_ON_ERR(bn_and(remainder, nn));
 		}
-		if (bn != remainder)
+		if (bn != remainder) {
 			bn_r_shift(bn, shift);
+		}
 		return (0);
 	}
 #endif
 	switch (bn_cmp(bn, d)) {
 	case 0: /* n = d */
 n_eq_d:
-		if (bn != remainder)
+		if (bn != remainder) {
 			bn_assign_digit(bn, 1);
+		}
 		bn_assign_zero(remainder);
 		return (0);
 	case -1: /* n < d */
 		if (bn != remainder) {
-			if (NULL != remainder)
+			if (NULL != remainder) {
 				error = bn_assign(remainder, bn);
+			}
 			bn_assign_zero(bn);
 		}
 		return (error);
@@ -3851,7 +3944,7 @@ n_eq_d:
 			if (bn_digits_cmp(&nn->num[i], &dd->num[i], d_digits) >= 0) {
 				bn_digits_sub__int(&nn->num[i], d_digits,
 				    &dd->num[i], d_digits, NULL);
-				if (0 != (1 & bn->num[0])) {/* Skeep first shift. */
+				if (0 != (1 & bn->num[0])) {/* Skip first shift. */
 					bn_digits_l_shift(bn->num, n_digits,
 					    (j - num_bits)); /* << Shift here many bytes. */
 					nn_shift += (j - num_bits);
@@ -3871,10 +3964,11 @@ n_eq_d:
 			j += tshift;
 			if (0 == (j & (BN_DIGIT_BITS - 1)) && 0 != j) {
 			//if (((j + tshift) & (~(BN_DIGIT_BITS - 1))) > (j & (~(BN_DIGIT_BITS - 1)))) {
-				if (0 != i)
+				if (0 != i) {
 					i --; /* Slide dd window. */
-				else
+				} else {
 					d_digits --; /* Decrease dd window. */
+				}
 			}
 			if (0 == tshift) {
 				j ++;
@@ -3889,22 +3983,25 @@ n_eq_d:
 			dd_shift ++;
 			bn_digits_r_shift(&dd->num[i], d_digits, 1);
 			if (0 == (j & (BN_DIGIT_BITS - 1)) && 0 != j) {
-				if (0 != i)
+				if (0 != i) {
 					i --; /* Slide dd window. */
-				else
+				} else {
 					d_digits --; /* Decrease dd window. */
+				}
 			}
 		#endif
 		}
-		if (j > (shift + 1) || j == num_bits)
+		if (j > (shift + 1) || j == num_bits) {
 			j = (shift + 1);
+		}
 		bn_digits_l_shift(bn->num, n_digits, ((j - num_bits) - 1)); /* << Final shift. */
 #endif
 	} else { /* Only remainder calculation. */
 		for (; shift >= 0; shift --) {
-			if (bn_digits_cmp(nn->num, dd->num, n_digits) >= 0)
+			if (bn_digits_cmp(nn->num, dd->num, n_digits) >= 0) {
 				bn_digits_sub__int(nn->num, n_digits,
 				    dd->num, n_digits, NULL);
+			}
 			bn_digits_r_shift(dd->num, n_digits, 1);
 		}
 		bn_update_digits__int(nn, n_digits);

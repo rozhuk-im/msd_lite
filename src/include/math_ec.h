@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2013 - 2014 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2013 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -55,58 +55,58 @@
 #define EC_CURVE_CALC_BITS_DBL(curve)	(BN_DIGIT_BITS + (2 * (curve)->m))
 
 
-#ifndef EC_USE_PROJECTIVE /* Affine point calculations.  */
+#ifndef EC_USE_PROJECTIVE /* Affine point calculations. */
 
-#	define ec_point_add(a, b, curve)					\
+#	define ec_point_add(a, b, curve)				\
 		ec_point_affine_add((a), (b), (curve))
-#	define ec_point_sub(a, b, curve)					\
+#	define ec_point_sub(a, b, curve)				\
 		ec_point_affine_sub((a), (b), (curve))
 
-#	define ec_point_bin_mult(point, d, curve)				\
+#	define ec_point_bin_mult(point, d, curve)			\
 		ec_point_affine_bin_mult((point), (d), (curve))
 
 #	define ec_pt_fpx_mult_data_t	ec_point_fpx_mult_data_t
 #	define ec_point_fpx_mult_precompute(wbits, point, curve, mult_data)	\
 		ec_point_affine_fpx_mult_precompute((wbits), (point), (curve), (mult_data))
-#	define ec_point_fpx_mult(point, mult_data, d, curve)			\
+#	define ec_point_fpx_mult(point, mult_data, d, curve)		\
 		ec_point_affine_fpx_mult((point), (mult_data), (d), (curve))
 
 #	define ec_pt_unkpt_mult_data_t	ec_point_unkpt_mult_data_t
 #	define ec_point_unkpt_mult_precompute(wbits, point, curve, mult_data)	\
 		ec_point_affine_unkpt_mult_precompute((wbits), (point), (curve), (mult_data))
-#	define ec_point_unkpt_mult(point, mult_data, d, curve)			\
+#	define ec_point_unkpt_mult(point, mult_data, d, curve)		\
 		ec_point_affine_unkpt_mult((point), (mult_data), (d), (curve))
 
-#	define ec_point_twin_mult(a, ad, b, bd, curve, res)			\
+#	define ec_point_twin_mult(a, ad, b, bd, curve, res)		\
 		ec_point_affine_twin_mult((a), (ad), (b), (bd), (curve), (res))
-#	define ec_point_fpx_unkpt_twin_mult_bp(Gd, b, bd, curve, res)		\
+#	define ec_point_fpx_unkpt_twin_mult_bp(Gd, b, bd, curve, res)	\
 		ec_point_affine_fpx_unkpt_twin_mult_bp((Gd), (b), (bd), (curve), (res))
 
-#else /* Projective point calculations.  */
+#else /* Projective point calculations. */
 
-#	define ec_point_add(a, b, curve)					\
+#	define ec_point_add(a, b, curve)				\
 		ec_point_proj_add_affine((a), (b), (curve))
-#	define ec_point_sub(a, b, curve)					\
+#	define ec_point_sub(a, b, curve)				\
 		ec_point_proj_sub_affine((a), (b), (curve))
 
-#	define ec_point_bin_mult(point, d, curve)				\
+#	define ec_point_bin_mult(point, d, curve)			\
 		ec_point_proj_bin_mult_affine((point), (d), (curve))
 
 #	define ec_pt_fpx_mult_data_t	ec_point_proj_fpx_mult_data_t
 #	define ec_point_fpx_mult_precompute(wbits, point, curve, mult_data)	\
 		ec_point_proj_fpx_mult_precompute_affine((wbits), (point), (curve), (mult_data))
-#	define ec_point_fpx_mult(point, mult_data, d, curve)			\
+#	define ec_point_fpx_mult(point, mult_data, d, curve)		\
 		ec_point_proj_fpx_mult_affine((point), (mult_data), (d), (curve))
 
 #	define ec_pt_unkpt_mult_data_t	ec_point_proj_unkpt_mult_data_t
 #	define ec_point_unkpt_mult_precompute(wbits, point, curve, mult_data)	\
 		ec_point_proj_unkpt_mult_precompute_affine((wbits), (point), (curve), (mult_data))
-#	define ec_point_unkpt_mult(point, mult_data, d, curve)			\
+#	define ec_point_unkpt_mult(point, mult_data, d, curve)		\
 		ec_point_proj_unkpt_mult_affine((point), (mult_data), (d), (curve))
 
-#	define ec_point_twin_mult(a, ad, b, bd, curve, res)			\
+#	define ec_point_twin_mult(a, ad, b, bd, curve, res)		\
 		ec_point_proj_twin_mult((a), (ad), (b), (bd), (curve), (res))
-#	define ec_point_fpx_unkpt_twin_mult_bp(Gd, b, bd, curve, res)		\
+#	define ec_point_fpx_unkpt_twin_mult_bp(Gd, b, bd, curve, res)	\
 		ec_point_proj_fpx_unkpt_twin_mult_bp_affine((Gd), (b), (bd), (curve), (res))
 
 #endif /* EC_USE_AFFINE */
@@ -123,7 +123,7 @@
 #ifdef EC_DISABLE_PUB_KEY_CHK
 #	define ec_point_check_as_pub_key__int(point, curve)	0 /* OK, no error. */
 #else
-#	define ec_point_check_as_pub_key__int(point, curve)			\
+#	define ec_point_check_as_pub_key__int(point, curve)		\
 		ec_point_check_as_pub_key((point), (curve))
 #endif
 
@@ -170,11 +170,11 @@ typedef struct elliptic_curve_point_projective_s {
 #define EC_PF_FXP_MULT_ALGO_MAX			EC_PF_FXP_MULT_ALGO_COMB_2T
 
 /* Default EC_PF_FXP_MULT_ALGO */
-#if !defined(EC_PF_FXP_MULT_ALGO) ||						\
-    (EC_PF_FXP_MULT_ALGO != EC_PF_FXP_MULT_ALGO_BIN &&				\
-    EC_PF_FXP_MULT_ALGO != EC_PF_FXP_MULT_ALGO_BIN_PRECALC_DBL &&		\
-    EC_PF_FXP_MULT_ALGO != EC_PF_FXP_MULT_ALGO_SLIDING_WIN &&			\
-    EC_PF_FXP_MULT_ALGO != EC_PF_FXP_MULT_ALGO_COMB_1T &&			\
+#if !defined(EC_PF_FXP_MULT_ALGO) ||					\
+    (EC_PF_FXP_MULT_ALGO != EC_PF_FXP_MULT_ALGO_BIN &&			\
+    EC_PF_FXP_MULT_ALGO != EC_PF_FXP_MULT_ALGO_BIN_PRECALC_DBL &&	\
+    EC_PF_FXP_MULT_ALGO != EC_PF_FXP_MULT_ALGO_SLIDING_WIN &&		\
+    EC_PF_FXP_MULT_ALGO != EC_PF_FXP_MULT_ALGO_COMB_1T &&		\
     EC_PF_FXP_MULT_ALGO != EC_PF_FXP_MULT_ALGO_COMB_2T)
 #	undef EC_PF_FXP_MULT_ALGO
 #	define EC_PF_FXP_MULT_ALGO	EC_PF_FXP_MULT_ALGO_COMB_2T
@@ -253,46 +253,46 @@ typedef struct elliptic_curve_proj_pf_fpx_comb2t_mult_data_s {
 #elif EC_PF_FXP_MULT_ALGO == EC_PF_FXP_MULT_ALGO_BIN_PRECALC_DBL
 #	define ec_point_fpx_mult_data_t		ec_point_fpx_pre_dbl_mult_data_t
 #	define ec_point_proj_fpx_mult_data_t	ec_point_proj_fpx_pre_dbl_mult_data_t
-#	define ec_point_affine_fpx_mult_precompute				\
+#	define ec_point_affine_fpx_mult_precompute			\
 		ec_point_affine_fpx_pre_dbl_mult_precompute
-#	define ec_point_affine_fpx_mult						\
+#	define ec_point_affine_fpx_mult					\
 		ec_point_affine_fpx_pre_dbl_mult
-#	define ec_point_proj_fpx_mult_precompute_affine				\
+#	define ec_point_proj_fpx_mult_precompute_affine			\
 		ec_point_proj_fpx_pre_dbl_mult_precompute_affine
-#	define ec_point_proj_fpx_mult						\
+#	define ec_point_proj_fpx_mult					\
 		ec_point_proj_fpx_pre_dbl_mult
 #elif EC_PF_FXP_MULT_ALGO == EC_PF_FXP_MULT_ALGO_SLIDING_WIN
 #	define ec_point_fpx_mult_data_t		ec_point_fpx_sl_win_mult_data_t
 #	define ec_point_proj_fpx_mult_data_t	ec_point_proj_fpx_sl_win_mult_data_t
-#	define ec_point_affine_fpx_mult_precompute				\
+#	define ec_point_affine_fpx_mult_precompute			\
 		ec_point_affine_fpx_sl_win_mult_precompute
-#	define ec_point_affine_fpx_mult						\
+#	define ec_point_affine_fpx_mult					\
 		ec_point_affine_fpx_sl_win_mult
-#	define ec_point_proj_fpx_mult_precompute_affine				\
+#	define ec_point_proj_fpx_mult_precompute_affine			\
 		ec_point_proj_fpx_sl_win_mult_precompute_affine
-#	define ec_point_proj_fpx_mult						\
+#	define ec_point_proj_fpx_mult					\
 		ec_point_proj_fpx_sl_win_mult
 #elif EC_PF_FXP_MULT_ALGO == EC_PF_FXP_MULT_ALGO_COMB_1T
 #	define ec_point_fpx_mult_data_t		ec_point_fpx_comb1t_mult_data_t
 #	define ec_point_proj_fpx_mult_data_t	ec_point_proj_fpx_comb1t_mult_data_t
-#	define ec_point_affine_fpx_mult_precompute				\
+#	define ec_point_affine_fpx_mult_precompute			\
 		ec_point_affine_fpx_comb1t_mult_precompute
-#	define ec_point_affine_fpx_mult						\
+#	define ec_point_affine_fpx_mult					\
 		ec_point_affine_fpx_comb1t_mult
-#	define ec_point_proj_fpx_mult_precompute_affine				\
+#	define ec_point_proj_fpx_mult_precompute_affine			\
 		ec_point_proj_fpx_comb1t_mult_precompute_affine
-#	define ec_point_proj_fpx_mult						\
+#	define ec_point_proj_fpx_mult					\
 		ec_point_proj_fpx_comb1t_mult
 #elif EC_PF_FXP_MULT_ALGO == EC_PF_FXP_MULT_ALGO_COMB_2T
 #	define ec_point_fpx_mult_data_t		ec_point_fpx_comb2t_mult_data_t
 #	define ec_point_proj_fpx_mult_data_t	ec_point_proj_fpx_comb2t_mult_data_t
-#	define ec_point_affine_fpx_mult_precompute				\
+#	define ec_point_affine_fpx_mult_precompute			\
 		ec_point_affine_fpx_comb2t_mult_precompute
-#	define ec_point_affine_fpx_mult						\
+#	define ec_point_affine_fpx_mult					\
 		ec_point_affine_fpx_comb2t_mult
-#	define ec_point_proj_fpx_mult_precompute_affine				\
+#	define ec_point_proj_fpx_mult_precompute_affine			\
 		ec_point_proj_fpx_comb2t_mult_precompute_affine
-#	define ec_point_proj_fpx_mult						\
+#	define ec_point_proj_fpx_mult					\
 		ec_point_proj_fpx_comb2t_mult
 #endif /* EC_PF_FXP_MULT_ALGO */
 
@@ -308,12 +308,12 @@ typedef struct elliptic_curve_proj_pf_fpx_comb2t_mult_data_s {
 #define EC_PF_UNKPT_MULT_ALGO_MAX		EC_PF_UNKPT_MULT_ALGO_SAME_AS_FXP
 
 /* Default EC_PF_UNKPT_MULT_ALGO */
-#if !defined(EC_PF_UNKPT_MULT_ALGO) ||						\
-    (EC_PF_UNKPT_MULT_ALGO != EC_PF_UNKPT_MULT_ALGO_BIN &&				\
-    EC_PF_UNKPT_MULT_ALGO != EC_PF_UNKPT_MULT_ALGO_BIN_PRECALC_DBL &&		\
-    EC_PF_UNKPT_MULT_ALGO != EC_PF_UNKPT_MULT_ALGO_SLIDING_WIN &&		\
-    EC_PF_UNKPT_MULT_ALGO != EC_PF_UNKPT_MULT_ALGO_COMB_1T &&			\
-    EC_PF_UNKPT_MULT_ALGO != EC_PF_UNKPT_MULT_ALGO_COMB_2T &&			\
+#if !defined(EC_PF_UNKPT_MULT_ALGO) ||					\
+    (EC_PF_UNKPT_MULT_ALGO != EC_PF_UNKPT_MULT_ALGO_BIN &&		\
+    EC_PF_UNKPT_MULT_ALGO != EC_PF_UNKPT_MULT_ALGO_BIN_PRECALC_DBL &&	\
+    EC_PF_UNKPT_MULT_ALGO != EC_PF_UNKPT_MULT_ALGO_SLIDING_WIN &&	\
+    EC_PF_UNKPT_MULT_ALGO != EC_PF_UNKPT_MULT_ALGO_COMB_1T &&		\
+    EC_PF_UNKPT_MULT_ALGO != EC_PF_UNKPT_MULT_ALGO_COMB_2T &&		\
     EC_PF_UNKPT_MULT_ALGO != EC_PF_UNKPT_MULT_ALGO_SAME_AS_FXP)
 #	undef EC_PF_UNKPT_MULT_ALGO
 #	define EC_PF_UNKPT_MULT_ALGO	EC_PF_UNKPT_MULT_ALGO_COMB_1T
@@ -324,7 +324,7 @@ typedef struct elliptic_curve_proj_pf_fpx_comb2t_mult_data_s {
 #	define EC_PF_UNKPT_MULT_WIN_BITS	2
 #endif
 
-/* Owerwrite by fixed piont settings. */
+/* Owerwrite by fixed point settings. */
 #if EC_PF_UNKPT_MULT_ALGO == EC_PF_UNKPT_MULT_ALGO_SAME_AS_FXP
 #	undef EC_PF_UNKPT_MULT_ALGO
 #	define EC_PF_UNKPT_MULT_ALGO		EC_PF_FXP_MULT_ALGO
@@ -337,46 +337,46 @@ typedef struct elliptic_curve_proj_pf_fpx_comb2t_mult_data_s {
 #elif EC_PF_UNKPT_MULT_ALGO == EC_PF_UNKPT_MULT_ALGO_BIN_PRECALC_DBL
 #	define ec_point_unkpt_mult_data_t	ec_point_fpx_pre_dbl_mult_data_t
 #	define ec_point_proj_unkpt_mult_data_t	ec_point_proj_fpx_pre_dbl_mult_data_t
-#	define ec_point_affine_unkpt_mult_precompute				\
+#	define ec_point_affine_unkpt_mult_precompute			\
 		ec_point_affine_fpx_pre_dbl_mult_precompute
-#	define ec_point_affine_unkpt_mult					\
+#	define ec_point_affine_unkpt_mult				\
 		ec_point_affine_fpx_pre_dbl_mult
-#	define ec_point_proj_unkpt_mult_precompute_affine			\
+#	define ec_point_proj_unkpt_mult_precompute_affine		\
 		ec_point_proj_fpx_pre_dbl_mult_precompute_affine
-#	define ec_point_proj_unkpt_mult						\
+#	define ec_point_proj_unkpt_mult					\
 		ec_point_proj_fpx_pre_dbl_mult
 #elif EC_PF_UNKPT_MULT_ALGO == EC_PF_UNKPT_MULT_ALGO_SLIDING_WIN
 #	define ec_point_unkpt_mult_data_t	ec_point_fpx_sl_win_mult_data_t
 #	define ec_point_proj_unkpt_mult_data_t	ec_point_proj_fpx_sl_win_mult_data_t
-#	define ec_point_affine_unkpt_mult_precompute				\
+#	define ec_point_affine_unkpt_mult_precompute			\
 		ec_point_affine_fpx_sl_win_mult_precompute
-#	define ec_point_affine_unkpt_mult					\
+#	define ec_point_affine_unkpt_mult				\
 		ec_point_affine_fpx_sl_win_mult
-#	define ec_point_proj_unkpt_mult_precompute_affine			\
+#	define ec_point_proj_unkpt_mult_precompute_affine		\
 		ec_point_proj_fpx_sl_win_mult_precompute_affine
-#	define ec_point_proj_unkpt_mult						\
+#	define ec_point_proj_unkpt_mult					\
 		ec_point_proj_fpx_sl_win_mult
 #elif EC_PF_UNKPT_MULT_ALGO == EC_PF_UNKPT_MULT_ALGO_COMB_1T
 #	define ec_point_unkpt_mult_data_t	ec_point_fpx_comb1t_mult_data_t
 #	define ec_point_proj_unkpt_mult_data_t	ec_point_proj_fpx_comb1t_mult_data_t
-#	define ec_point_affine_unkpt_mult_precompute				\
+#	define ec_point_affine_unkpt_mult_precompute			\
 		ec_point_affine_fpx_comb1t_mult_precompute
-#	define ec_point_affine_unkpt_mult					\
+#	define ec_point_affine_unkpt_mult				\
 		ec_point_affine_fpx_comb1t_mult
-#	define ec_point_proj_unkpt_mult_precompute_affine			\
+#	define ec_point_proj_unkpt_mult_precompute_affine		\
 		ec_point_proj_fpx_comb1t_mult_precompute_affine
-#	define ec_point_proj_unkpt_mult						\
+#	define ec_point_proj_unkpt_mult					\
 		ec_point_proj_fpx_comb1t_mult
 #elif EC_PF_UNKPT_MULT_ALGO == EC_PF_UNKPT_MULT_ALGO_COMB_2T
 #	define ec_point_unkpt_mult_data_t	ec_point_fpx_comb2t_mult_data_t
 #	define ec_point_proj_unkpt_mult_data_t	ec_point_proj_fpx_comb2t_mult_data_t
-#	define ec_point_affine_unkpt_mult_precompute				\
+#	define ec_point_affine_unkpt_mult_precompute			\
 		ec_point_affine_fpx_comb2t_mult_precompute
-#	define ec_point_affine_unkpt_mult					\
+#	define ec_point_affine_unkpt_mult				\
 		ec_point_affine_fpx_comb2t_mult
-#	define ec_point_proj_unkpt_mult_precompute_affine			\
+#	define ec_point_proj_unkpt_mult_precompute_affine		\
 		ec_point_proj_fpx_comb2t_mult_precompute_affine
-#	define ec_point_proj_unkpt_mult						\
+#	define ec_point_proj_unkpt_mult					\
 		ec_point_proj_fpx_comb2t_mult
 #endif /* EC_PF_UNKPT_MULT_ALGO */
 
@@ -399,10 +399,10 @@ typedef struct elliptic_curve_proj_pf_fpx_comb2t_mult_data_s {
 #define EC_PF_TWIN_MULT_ALGO_INTER		3
 
 /* Default EC_PF_TWIN_MULT_ALGO */
-#if !defined(EC_PF_TWIN_MULT_ALGO) ||						\
-    (EC_PF_TWIN_MULT_ALGO != EC_PF_TWIN_MULT_ALGO_BIN &&			\
-    EC_PF_TWIN_MULT_ALGO != EC_PF_TWIN_MULT_ALGO_FXP_UNKPT &&			\
-    EC_PF_TWIN_MULT_ALGO != EC_PF_TWIN_MULT_ALGO_JOINT &&			\
+#if !defined(EC_PF_TWIN_MULT_ALGO) ||					\
+    (EC_PF_TWIN_MULT_ALGO != EC_PF_TWIN_MULT_ALGO_BIN &&		\
+    EC_PF_TWIN_MULT_ALGO != EC_PF_TWIN_MULT_ALGO_FXP_UNKPT &&		\
+    EC_PF_TWIN_MULT_ALGO != EC_PF_TWIN_MULT_ALGO_JOINT &&		\
     EC_PF_TWIN_MULT_ALGO != EC_PF_TWIN_MULT_ALGO_INTER)
 #	undef EC_PF_TWIN_MULT_ALGO
 #	define EC_PF_TWIN_MULT_ALGO	EC_PF_TWIN_MULT_ALGO_JOINT
@@ -411,8 +411,8 @@ typedef struct elliptic_curve_proj_pf_fpx_comb2t_mult_data_s {
  * EC_PF_FXP_MULT_ALGO == EC_PF_FXP_MULT_ALGO_BIN and
  * EC_PF_UNKPT_MULT_ALGO == EC_PF_UNKPT_MULT_ALGO_BIN
  */
-#if (EC_PF_TWIN_MULT_ALGO == EC_PF_TWIN_MULT_ALGO_FXP_UNKPT) &&			\
-    EC_PF_FXP_MULT_ALGO == EC_PF_FXP_MULT_ALGO_BIN &&				\
+#if (EC_PF_TWIN_MULT_ALGO == EC_PF_TWIN_MULT_ALGO_FXP_UNKPT) &&		\
+    EC_PF_FXP_MULT_ALGO == EC_PF_FXP_MULT_ALGO_BIN &&			\
     EC_PF_UNKPT_MULT_ALGO == EC_PF_UNKPT_MULT_ALGO_BIN
 #	undef EC_PF_TWIN_MULT_ALGO
 #	define EC_PF_TWIN_MULT_ALGO	EC_PF_TWIN_MULT_ALGO_BIN
@@ -421,24 +421,24 @@ typedef struct elliptic_curve_proj_pf_fpx_comb2t_mult_data_s {
 
 
 #if EC_PF_TWIN_MULT_ALGO == EC_PF_TWIN_MULT_ALGO_BIN
-#	define ec_point_affine_twin_mult					\
+#	define ec_point_affine_twin_mult				\
 		ec_point_affine_bin_twin_mult
-#	define ec_point_proj_twin_mult						\
+#	define ec_point_proj_twin_mult					\
 		ec_point_proj_bin_twin_mult_affine
 #elif EC_PF_TWIN_MULT_ALGO == EC_PF_TWIN_MULT_ALGO_FXP_UNKPT
-#	define ec_point_affine_twin_mult					\
+#	define ec_point_affine_twin_mult				\
 		ec_point_affine_bin_twin_mult
-#	define ec_point_proj_twin_mult						\
+#	define ec_point_proj_twin_mult					\
 		ec_point_proj_bin_twin_mult_affine
 #elif EC_PF_TWIN_MULT_ALGO == EC_PF_TWIN_MULT_ALGO_JOINT
-#	define ec_point_affine_twin_mult					\
+#	define ec_point_affine_twin_mult				\
 		ec_point_affine_joint_twin_mult
-#	define ec_point_proj_twin_mult						\
+#	define ec_point_proj_twin_mult					\
 		ec_point_proj_joint_twin_mult_affine
 #elif EC_PF_TWIN_MULT_ALGO == EC_PF_TWIN_MULT_ALGO_INTER
-#	define ec_point_affine_twin_mult					\
+#	define ec_point_affine_twin_mult				\
 		ec_point_affine_inter_twin_mult
-#	define ec_point_proj_twin_mult						\
+#	define ec_point_proj_twin_mult					\
 		ec_point_proj_inter_twin_mult_affine
 #endif /* EC_PF_TWIN_MULT_ALGO */
 
@@ -535,9 +535,11 @@ ec_point_is_eq(ec_point_p a, ec_point_p b) {
 		return (1);
 	if (NULL == a || NULL == b)
 		return (0);
-	if (0 != ec_point_is_at_infinity(a) && 0 != ec_point_is_at_infinity(b))
+	if (0 != ec_point_is_at_infinity(a) &&
+	    0 != ec_point_is_at_infinity(b))
 		return (1);
-	if (0 == ec_point_is_at_infinity(a) && 0 == ec_point_is_at_infinity(b) &&
+	if (0 == ec_point_is_at_infinity(a) &&
+	    0 == ec_point_is_at_infinity(b) &&
 	    0 != bn_is_equal(&a->x, &b->x) &&
 	    0 != bn_is_equal(&a->y, &b->y))
 		return (1);
@@ -781,8 +783,9 @@ point_double:
 		BN_RET_ON_ERR(bn_assign(&tmC, &a->x));
 		BN_RET_ON_ERR(bn_mod_mult(&tmC, &y2, &curve->p, &curve->p_mod_rd_data));
 		BN_RET_ON_ERR(bn_mod_square(&y2, &curve->p, &curve->p_mod_rd_data));
-		if (0 != bn_is_odd(&y2))
+		if (0 != bn_is_odd(&y2)) {
 			BN_RET_ON_ERR(bn_add(&y2, &curve->p, NULL));
+		}
 		bn_r_shift(&y2, 1);
 		BN_RET_ON_ERR(bn_assign(&tmA, &tmB));
 		BN_RET_ON_ERR(bn_mod_square(&tmA, &curve->p, &curve->p_mod_rd_data));
@@ -884,8 +887,9 @@ ec_point_proj_dbl_n(ec_point_proj_p point, size_t n, ec_curve_p curve) {
 		BN_RET_ON_ERR(bn_assign(&point->z, &tm));
 		/* y2 = y2^2 */
 		BN_RET_ON_ERR(bn_mod_square(&y2, &curve->p, &curve->p_mod_rd_data));
-		if (i < (n - 1)) /* tmC = tmC * Y^4 */
+		if (i < (n - 1)) { /* tmC = tmC * Y^4 */
 			BN_RET_ON_ERR(bn_mod_mult(&tmC, &y2, &curve->p, &curve->p_mod_rd_data));
+		}
 		/* Y = 2 * tmA * (tmB - X) - Y^4 */
 		BN_RET_ON_ERR(bn_mod_sub(&tmB, &point->x, &curve->p, &curve->p_mod_rd_data));
 		BN_RET_ON_ERR(bn_mod_mult_digit(&tmA, 2, &curve->p, &curve->p_mod_rd_data));
@@ -894,9 +898,10 @@ ec_point_proj_dbl_n(ec_point_proj_p point, size_t n, ec_curve_p curve) {
 		BN_RET_ON_ERR(bn_assign(&Y, &tmA));
 	}
 
-	if (0 != bn_is_odd(&Y))
+	if (0 != bn_is_odd(&Y)) {
 		BN_RET_ON_ERR(bn_add(&Y, &curve->p, NULL));
 		//BN_RET_ON_ERR(bn_mod_add(&tmA, &tm, &curve->p, &curve->p_mod_rd_data));
+	}
 	bn_r_shift(&Y, 1);
 	BN_RET_ON_ERR(bn_assign(&point->y, &Y));
 #else
@@ -1111,8 +1116,9 @@ ec_point_proj_bin_mult(ec_point_proj_p point, bn_p d, ec_curve_p curve) {
 	bn_assign_zero(&point->z); /* "Zeroize" point. */
 	bits = bn_calc_bits(d);
 	for (i = 0; i < bits; i ++) {
-		if (0 != bn_is_bit_set(d, i))
+		if (0 != bn_is_bit_set(d, i)) {
 			BN_RET_ON_ERR(ec_point_proj_add(point, &tm, curve)); /* res += point */
+		}
 		BN_RET_ON_ERR(ec_point_proj_add(&tm, &tm, curve)); /* point *= 2 */
 	}
 	return (0);
@@ -1183,7 +1189,7 @@ ec_point_proj_fpx_pre_dbl_mult(ec_point_proj_p point,
 		return (0);
 	bits = bn_calc_bits(d);
 	for (i = 0; i < bits; i ++) {
-		if (0 != bn_is_bit_set(d, i))
+		if (0 != bn_is_bit_set(d, i)) {
 #ifdef EC_PROJ_ADD_MIX
 			BN_RET_ON_ERR(ec_point_proj_add_mix(point,
 			    &mult_data->pt_arr[i], curve));
@@ -1191,6 +1197,7 @@ ec_point_proj_fpx_pre_dbl_mult(ec_point_proj_p point,
 			BN_RET_ON_ERR(ec_point_proj_add(point,
 			    &mult_data->pt_arr[i], curve));
 #endif
+		}
 	}
 	return (0);
 }
@@ -1267,10 +1274,10 @@ ec_point_proj_fpx_sl_win_mult(ec_point_proj_p point,
 	if (0 != bn_is_zero(d) || 0 == mult_data->wnd_bits) /* ec_point_proj_is_at_infinity */
 		return (0);
 	mask = ((((bn_digit_t)1) << mult_data->wnd_bits) - 1);
-	for (i = (d->digits - 1); i >= 0; i --) {
+	for (i = (ssize_t)(d->digits - 1); i >= 0; i --) {
 		for (j = ((BN_DIGIT_BITS / mult_data->wnd_bits) - 1); j >= 0; j --) {
 			BN_RET_ON_ERR(ec_point_proj_dbl_n(point, mult_data->wnd_bits, curve));
-			windex = (mask & (d->num[i] >> (j * mult_data->wnd_bits)));
+			windex = (mask & (d->num[i] >> ((size_t)j * mult_data->wnd_bits)));
 			if (0 == windex)
 				continue;
 #ifdef EC_PROJ_ADD_MIX
@@ -1311,9 +1318,9 @@ ec_point_proj_fpx_comb1t_mult_precompute_affine(size_t wnd_bits, ec_point_p poin
 	BN_RET_ON_ERR(ec_point_assign(&mult_data->pt_add_arr[0], point));
 	BN_RET_ON_ERR(ec_point_proj_init(&tm, curve->m));
 	for (i = 1; i < wnd_bits; i ++) {
-		iidx = (1 << i);
+		iidx = (((size_t)1) << i);
 		BN_RET_ON_ERR(ec_point_proj_import_affine(&tm,
-		    &mult_data->pt_add_arr[((1 << (i - 1)) - 1)], curve));
+		    &mult_data->pt_add_arr[((((size_t)1) << (i - 1)) - 1)], curve));
 		BN_RET_ON_ERR(ec_point_proj_dbl_n(&tm, mult_data->wnd_count, curve));
 		BN_RET_ON_ERR(ec_point_init(&mult_data->pt_add_arr[(iidx - 1)],
 		    curve->m));
@@ -1335,12 +1342,12 @@ ec_point_proj_fpx_comb1t_mult_precompute_affine(size_t wnd_bits, ec_point_p poin
 	BN_RET_ON_ERR(ec_point_proj_import_affine(&mult_data->pt_add_arr[0],
 	    point, curve));
 	for (i = 1; i < wnd_bits; i ++) {
-		iidx = (1 << i);
+		iidx = (((size_t)1) << i);
 		BN_RET_ON_ERR(ec_point_proj_init(&mult_data->pt_add_arr[(iidx - 1)],
 		    curve->m));
 		BN_RET_ON_ERR(ec_point_proj_assign(
 		    &mult_data->pt_add_arr[(iidx - 1)],
-		    &mult_data->pt_add_arr[((1 << (i - 1)) - 1)]));
+		    &mult_data->pt_add_arr[((((size_t)1) << (i - 1)) - 1)]));
 		BN_RET_ON_ERR(ec_point_proj_dbl_n(&mult_data->pt_add_arr[(iidx - 1)],
 		    mult_data->wnd_count, curve));
 		BN_RET_ON_ERR(ec_point_proj_norm(&mult_data->pt_add_arr[(iidx - 1)],
@@ -1365,7 +1372,8 @@ ec_point_proj_fpx_comb1t_mult_precompute_affine(size_t wnd_bits, ec_point_p poin
 static inline int
 ec_point_proj_fpx_comb1t_mult(ec_point_proj_p point,
     ec_point_proj_fpx_comb1t_mult_data_p mult_data, bn_p d, ec_curve_p curve) {
-	ssize_t i, bit_off;
+	ssize_t i;
+	size_t bit_off;
 	bn_digit_t windex;
 
 	if (NULL == point || NULL == d || NULL == mult_data || NULL == curve)
@@ -1394,7 +1402,7 @@ ec_point_proj_fpx_comb1t_mult(ec_point_proj_p point,
 		return (0);
 	}
 	bit_off = ((mult_data->wnd_bits * mult_data->wnd_count) - 1);
-	for (i = (mult_data->wnd_count - 1); i >= 0; i --, bit_off --) {
+	for (i = (ssize_t)(mult_data->wnd_count - 1); i >= 0; i --, bit_off --) {
 		BN_RET_ON_ERR(ec_point_proj_add(point, point, curve));
 		/* 1. Add table. */
 		windex = bn_combo_column_get(d, bit_off,
@@ -1458,7 +1466,8 @@ ec_point_proj_fpx_comb2t_mult_precompute_affine(size_t wnd_bits, ec_point_p poin
 static inline int
 ec_point_proj_fpx_comb2t_mult(ec_point_proj_p point,
     ec_point_proj_fpx_comb2t_mult_data_p mult_data, bn_p d, ec_curve_p curve) {
-	ssize_t i, bit_off;
+	ssize_t i;
+	size_t bit_off;
 	bn_digit_t windex;
 
 	if (NULL == point || NULL == d || NULL == mult_data || NULL == curve)
@@ -1488,7 +1497,7 @@ ec_point_proj_fpx_comb2t_mult(ec_point_proj_p point,
 	}
 	bit_off = (((mult_data->wnd_bits - 1) * mult_data->wnd_count) +
 	    (mult_data->e_count - 1));
-	for (i = (mult_data->e_count - 1); i >= 0; i --, bit_off --) {
+	for (i = (ssize_t)(mult_data->e_count - 1); i >= 0; i --, bit_off --) {
 		BN_RET_ON_ERR(ec_point_proj_add(point, point, curve));
 		/* 1. Add table. */
 		windex = bn_combo_column_get(d, bit_off,
@@ -1503,7 +1512,7 @@ ec_point_proj_fpx_comb2t_mult(ec_point_proj_p point,
 #endif
 		}
 		/* 2. Dbl table. */
-		if ((i + mult_data->e_count) >= mult_data->wnd_count)
+		if (((size_t)i + mult_data->e_count) >= mult_data->wnd_count)
 			continue;
 		windex = bn_combo_column_get(d, (bit_off + mult_data->e_count),
 		    mult_data->wnd_bits, mult_data->wnd_count);
@@ -1655,8 +1664,9 @@ ec_point_proj_joint_twin_mult_affine(ec_point_p a, bn_p ad, ec_point_p b, bn_p b
 	BN_RET_ON_ERR(ec_point_proj_export_affine(&tm, &tbl[3], curve));
 #else
 	/* Init table. */
-	for (i = 0; i < 4; i ++)
+	for (i = 0; i < 4; i ++) {
 		BN_RET_ON_ERR(ec_point_proj_init(&tbl[i], curve->m));
+	}
 	/* b */
 	BN_RET_ON_ERR(ec_point_proj_import_affine(&tbl[0], b, curve));
 	/* a */
@@ -1675,10 +1685,10 @@ ec_point_proj_joint_twin_mult_affine(ec_point_p a, bn_p ad, ec_point_p b, bn_p b
 	BN_RET_ON_ERR(bn_calc_jsf(ad, bd, sizeof(jsf), jsf, &jsf_cnt, &offset));
 
 	bn_assign_zero(&tm.z); /* "Zeroize" point. */
-	for (i = (jsf_cnt - 1); i >= 0; i --) {
+	for (i = (ssize_t)(jsf_cnt - 1); i >= 0; i --) {
 		BN_RET_ON_ERR(ec_point_proj_add(&tm, &tm, curve));
-		idx = ((jsf[i] * 2) + jsf[(i + offset)]);
-		if (0 != jsf[i] && jsf[i] == -jsf[(i + offset)]) {
+		idx = ((jsf[i] * 2) + jsf[((size_t)i + offset)]);
+		if (0 != jsf[i] && jsf[i] == -jsf[((size_t)i + offset)]) {
 			if (idx < 0) {
 				idx = - 4;
 			} else {
@@ -1721,7 +1731,7 @@ void ep_tab(ep_t *t, const ep_t p, int w) {
 	if (w > 2) {
 		ep_dbl(t[0], p);
 		ep_add(t[1], t[0], p);
-		for (int i = 2; i < (1 << (w - 2)); i++) {
+		for (int i = 2; i < (((size_t)1) << (w - 2)); i++) {
 			ep_add(t[i], t[i - 1], t[0]);
 		}
 	}
@@ -1744,8 +1754,9 @@ ec_point_proj_inter_twin_mult_precalc_affine(ec_point_p point, size_t wnd_bits,
 	BN_RET_ON_ERR(ec_point_proj_init(&tm, curve->m));
 
 	/* Init table. */
-	for (i = 0; i < (1 << (wnd_bits - 2)); i ++)
+	for (i = 0; i < (((size_t)1) << (wnd_bits - 2)); i ++) {
 		BN_RET_ON_ERR(ec_point_init(&tbl[i], curve->m));
+	}
 	if (wnd_bits > 2) {
 		/* 0 */
 		BN_RET_ON_ERR(ec_point_proj_import_affine(&tm, point, curve));
@@ -1755,7 +1766,7 @@ ec_point_proj_inter_twin_mult_precalc_affine(ec_point_p point, size_t wnd_bits,
 		BN_RET_ON_ERR(ec_point_proj_add_mix(&tm, point, curve));
 		BN_RET_ON_ERR(ec_point_proj_export_affine(&tm, &tbl[1], curve));
 		/* 2... */
-		for (i = 2; i < (1 << (wnd_bits - 2)); i ++) {
+		for (i = 2; i < (((size_t)1) << (wnd_bits - 2)); i ++) {
 			BN_RET_ON_ERR(ec_point_proj_add_mix(&tm, &tbl[0], curve));
 			BN_RET_ON_ERR(ec_point_proj_export_affine(&tm, &tbl[i], curve));
 		}
@@ -1764,8 +1775,9 @@ ec_point_proj_inter_twin_mult_precalc_affine(ec_point_p point, size_t wnd_bits,
 	BN_RET_ON_ERR(ec_point_assign(&tbl[0], point));
 #else
 	/* Init table. */
-	for (i = 0; i < (1 << (wnd_bits - 2)); i ++)
+	for (i = 0; i < (((size_t)1) << (wnd_bits - 2)); i ++) {
 		BN_RET_ON_ERR(ec_point_proj_init(&tbl[i], curve->m));
+	}
 	if (wnd_bits > 2) {
 		/* 0 */
 		BN_RET_ON_ERR(ec_point_proj_import_affine(&tbl[0], point, curve));
@@ -1776,7 +1788,7 @@ ec_point_proj_inter_twin_mult_precalc_affine(ec_point_p point, size_t wnd_bits,
 		BN_RET_ON_ERR(ec_point_proj_add(&tbl[1], &tbl[0], curve));
 		BN_RET_ON_ERR(ec_point_proj_norm(&tbl[1], curve));
 		/* 2... */
-		for (i = 2; i < (1 << (wnd_bits - 2)); i ++) {
+		for (i = 2; i < (((size_t)1) << (wnd_bits - 2)); i ++) {
 			BN_RET_ON_ERR(ec_point_proj_assign(&tbl[i], &tbl[(i - 1)]));
 			BN_RET_ON_ERR(ec_point_proj_add(&tbl[i], &tbl[0], curve));
 			BN_RET_ON_ERR(ec_point_proj_norm(&tbl[i], curve));
@@ -1803,9 +1815,9 @@ ec_point_proj_inter_twin_mult_affine(ec_point_p a, bn_p ad, ec_point_p b, bn_p b
 
 	/* Compute the precomputation table. */
 	BN_RET_ON_ERR(ec_point_proj_inter_twin_mult_precalc_affine(a, EP_DEPTH,
-	    curve, (struct ec_point_t*)tbl0));
+	    curve, (ec_point_t*)tbl0));
 	BN_RET_ON_ERR(ec_point_proj_inter_twin_mult_precalc_affine(b, EP_WIDTH,
-	    curve, (struct ec_point_t*)tbl1));
+	    curve, (ec_point_t*)tbl1));
 
 	/* Compute the w-TNAF representation of k. */
 	BN_RET_ON_ERR(bn_calc_naf(ad, EP_DEPTH, sizeof(naf0), naf0, &naf0_cnt));
@@ -1814,7 +1826,7 @@ ec_point_proj_inter_twin_mult_affine(ec_point_p a, bn_p ad, ec_point_p b, bn_p b
 
 	BN_RET_ON_ERR(ec_point_proj_init(&tm, curve->m));
 	bn_assign_zero(&tm.z); /* "Zeroize" point. */
-	for (i = (naf_cnt - 1); i >= 0; i --) {
+	for (i = (ssize_t)(naf_cnt - 1); i >= 0; i --) {
 		BN_RET_ON_ERR(ec_point_proj_add(&tm, &tm, curve));
 #ifdef EC_PROJ_ADD_MIX
 		if (0 != naf0[i]) {
@@ -1965,8 +1977,9 @@ static inline int
 ec_point_affine_dbl_n(ec_point_p point, size_t n, ec_curve_p curve) {
 	size_t i;
 
-	for (i = 0; i < n; i ++)
+	for (i = 0; i < n; i ++) {
 		BN_RET_ON_ERR(ec_point_affine_add(point, point, curve));
+	}
 	return (0);
 }
 
@@ -1992,8 +2005,9 @@ ec_point_affine_bin_mult(ec_point_p point, bn_p d, ec_curve_p curve) {
 	point->infinity = 1; /* "Zeroize" point. */
 	bits = bn_calc_bits(d);
 	for (i = 0; i < bits; i ++) {
-		if (0 != bn_is_bit_set(d, i))
+		if (0 != bn_is_bit_set(d, i)) {
 			BN_RET_ON_ERR(ec_point_affine_add(point, &tm, curve)); /* res += point */
+		}
 		BN_RET_ON_ERR(ec_point_affine_add(&tm, &tm, curve)); /* point *= 2 */
 	}
 	return (0);
@@ -2038,9 +2052,10 @@ ec_point_affine_fpx_pre_dbl_mult(ec_point_p point,
 		return (0);
 	bits = bn_calc_bits(d);
 	for (i = 0; i < bits; i ++) {
-		if (0 != bn_is_bit_set(d, i))
+		if (0 != bn_is_bit_set(d, i)) {
 			BN_RET_ON_ERR(ec_point_affine_add(point,
 			    &mult_data->pt_arr[i], curve));
+		}
 	}
 	return (0);
 }
@@ -2067,9 +2082,10 @@ ec_point_affine_fpx_sl_win_mult_precompute(size_t wnd_bits, ec_point_p point,
 		BN_RET_ON_ERR(ec_point_init(&mult_data->pt_arr[i], curve->m));
 		BN_RET_ON_ERR(ec_point_assign(&mult_data->pt_arr[i], point));
 	}
-	for (i = 1; i < pt_cnt; i ++)
+	for (i = 1; i < pt_cnt; i ++) {
 		BN_RET_ON_ERR(ec_point_affine_add(&mult_data->pt_arr[i],
 		    &mult_data->pt_arr[(i - 1)], curve));
+	}
 	return (0);
 }
 
@@ -2090,11 +2106,12 @@ ec_point_affine_fpx_sl_win_mult(ec_point_p point,
 	if (0 != bn_is_zero(d) || 0 == mult_data->wnd_bits) /* ec_point_is_at_infinity */
 		return (0);
 	mask = ((((bn_digit_t)1) << mult_data->wnd_bits) - 1);
-	for (i = (d->digits - 1); i >= 0; i --) {
+	for (i = (ssize_t)(d->digits - 1); i >= 0; i --) {
 		for (j = ((BN_DIGIT_BITS / mult_data->wnd_bits) - 1); j >= 0; j --) {
-			for (k = 0; k < mult_data->wnd_bits; k ++)
+			for (k = 0; k < mult_data->wnd_bits; k ++) {
 				BN_RET_ON_ERR(ec_point_affine_add(point, point, curve));
-			windex = (mask & (d->num[i] >> (j * mult_data->wnd_bits)));
+			}
+			windex = (mask & (d->num[i] >> ((size_t)j * mult_data->wnd_bits)));
 			if (0 == windex)
 				continue;
 			BN_RET_ON_ERR(ec_point_affine_add(point,
@@ -2126,11 +2143,11 @@ ec_point_affine_fpx_comb1t_mult_precompute(size_t wnd_bits, ec_point_p point,
 	BN_RET_ON_ERR(ec_point_init(&mult_data->pt_add_arr[0], curve->m));
 	BN_RET_ON_ERR(ec_point_assign(&mult_data->pt_add_arr[0], point));
 	for (i = 1; i < wnd_bits; i ++) {
-		iidx = (1 << i);
+		iidx = (((size_t)1) << i);
 		BN_RET_ON_ERR(ec_point_init(&mult_data->pt_add_arr[(iidx - 1)],
 		    curve->m));
 		BN_RET_ON_ERR(ec_point_assign(&mult_data->pt_add_arr[(iidx - 1)],
-		    &mult_data->pt_add_arr[((1 << (i - 1)) - 1)]));
+		    &mult_data->pt_add_arr[((((size_t)1) << (i - 1)) - 1)]));
 		BN_RET_ON_ERR(ec_point_affine_dbl_n(&mult_data->pt_add_arr[(iidx - 1)],
 		    mult_data->wnd_count, curve));
 		for (j = 1; j < iidx; j ++) {
@@ -2150,7 +2167,8 @@ ec_point_affine_fpx_comb1t_mult_precompute(size_t wnd_bits, ec_point_p point,
 static inline int
 ec_point_affine_fpx_comb1t_mult(ec_point_p point,
     ec_point_fpx_comb1t_mult_data_p mult_data, bn_p d, ec_curve_p curve) {
-	ssize_t i, bit_off;
+	ssize_t i;
+	size_t bit_off;
 	bn_digit_t windex;
 
 	if (NULL == point || NULL == mult_data || NULL == d || NULL == curve)
@@ -2169,7 +2187,7 @@ ec_point_affine_fpx_comb1t_mult(ec_point_p point,
 		return (0);
 	}
 	bit_off = ((mult_data->wnd_bits * mult_data->wnd_count) - 1);
-	for (i = (mult_data->wnd_count - 1); i >= 0; i --, bit_off --) {
+	for (i = (ssize_t)(mult_data->wnd_count - 1); i >= 0; i --, bit_off --) {
 		BN_RET_ON_ERR(ec_point_affine_add(point, point, curve));
 		/* 1. Add table. */
 		windex = bn_combo_column_get(d, bit_off,
@@ -2214,7 +2232,8 @@ ec_point_affine_fpx_comb2t_mult_precompute(size_t wnd_bits, ec_point_p point,
 static inline int
 ec_point_affine_fpx_comb2t_mult(ec_point_p point,
     ec_point_fpx_comb2t_mult_data_p mult_data, bn_p d, ec_curve_p curve) {
-	ssize_t i, bit_off;
+	ssize_t i;
+	size_t bit_off;
 	bn_digit_t windex;
 
 	if (NULL == point || NULL == mult_data || NULL == d || NULL == curve)
@@ -2234,7 +2253,7 @@ ec_point_affine_fpx_comb2t_mult(ec_point_p point,
 	}
 	bit_off = (((mult_data->wnd_bits - 1) * mult_data->wnd_count) +
 	    (mult_data->e_count - 1));
-	for (i = (mult_data->e_count - 1); i >= 0; i --, bit_off --) {
+	for (i = (ssize_t)(mult_data->e_count - 1); i >= 0; i --, bit_off --) {
 		BN_RET_ON_ERR(ec_point_affine_add(point, point, curve));
 		/* 1. Add table. */
 		windex = bn_combo_column_get(d, bit_off,
@@ -2244,7 +2263,7 @@ ec_point_affine_fpx_comb2t_mult(ec_point_p point,
 			    &mult_data->pt_add_arr[(windex - 1)], curve));
 		}
 		/* 2. Dbl table. */
-		if ((i + mult_data->e_count) >= mult_data->wnd_count)
+		if (((size_t)i + mult_data->e_count) >= mult_data->wnd_count)
 			continue;
 		windex = bn_combo_column_get(d, (bit_off + mult_data->e_count),
 		    mult_data->wnd_bits, mult_data->wnd_count);
@@ -2327,8 +2346,9 @@ ec_point_affine_joint_twin_mult(ec_point_p a, bn_p ad, ec_point_p b, bn_p bd,
 		return (EINVAL);
 
 	/* Init table. */
-	for (i = 0; i < 4; i ++)
+	for (i = 0; i < 4; i ++) {
 		BN_RET_ON_ERR(ec_point_init(&tbl[i], curve->m));
+	}
 	/* b */
 	BN_RET_ON_ERR(ec_point_assign(&tbl[0], b));
 	/* a */
@@ -2344,10 +2364,10 @@ ec_point_affine_joint_twin_mult(ec_point_p a, bn_p ad, ec_point_p b, bn_p bd,
 	BN_RET_ON_ERR(bn_calc_jsf(ad, bd, sizeof(jsf), jsf, &len, &offset));
 
 	res->infinity = 1; /* "Zeroize" point. */
-	for (i = (len - 1); i >= 0; i --) {
+	for (i = (ssize_t)(len - 1); i >= 0; i --) {
 		BN_RET_ON_ERR(ec_point_affine_add(res, res, curve));
-		idx = ((jsf[i] * 2) + jsf[(i + offset)]);
-		if (0 != jsf[i] && jsf[i] == -jsf[(i + offset)]) {
+		idx = ((jsf[i] * 2) + jsf[((size_t)i + offset)]);
+		if (0 != jsf[i] && jsf[i] == -jsf[((size_t)i + offset)]) {
 			if (idx < 0) {
 				idx = - 4;
 			} else {
@@ -2555,7 +2575,7 @@ ec_curve_validate(ec_curve_p curve, int *warnings) {
 	if (NULL == curve)
 		return (EINVAL);
 	/* Double size + 1 digit. */
-	bits = EC_CURVE_CALC_BITS_DBL(curve);;
+	bits = EC_CURVE_CALC_BITS_DBL(curve);
 	/* Init */
 	BN_RET_ON_ERR(bn_init(&a, bits));
 	BN_RET_ON_ERR(bn_init(&b, bits));
@@ -2659,8 +2679,9 @@ ec_curve_validate(ec_curve_p curve, int *warnings) {
 	 * Annex A.3.3, verify that SEED is a bit string of length at least
 	 * 160 bits, and that a and b were suitably derived from SEED.
 	 */
-	if (NULL != warnings)
+	if (NULL != warnings) {
 		(*warnings) = wrngs;
+	}
 	return (0);
 }
 

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2010 - 2014 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2010 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,8 +33,8 @@
 #include <sys/param.h>
 
 #ifdef __linux__ /* Linux specific code. */
-#define _GNU_SOURCE /* See feature_test_macros(7) */
-#define __USE_GNU 1
+#	define _GNU_SOURCE /* See feature_test_macros(7) */
+#	define __USE_GNU 1
 #endif /* Linux specific code. */
 
 #include <sys/types.h>
@@ -44,11 +44,11 @@
 #include <string.h> /* bcopy, bzero, memcpy, memmove, memset, strerror... */
 #include <errno.h>
 
-#include "HTTP.h"
-#include "mem_find.h"
-#include "buf_case.h"
+#include "macro_helpers.h"
+#include "mem_helpers.h"
 #include "StrToNum.h"
 #include "StrHexToNum.h"
+#include "HTTP.h"
 
 
 /* http://www.iana.org/assignments/http-status-codes/http-status-codes.xml */
@@ -229,46 +229,62 @@ http_get_err_descr(uint32_t status_code, size_t *descr_size_ret) {
 	if (100 > status_code) { /* 0 - 99 */
 	} else if (200 > status_code) { /* 100 - 199 */
 		status_code -= 100;
-		if (sizeof(reason_phrase_1xx) > status_code)
+		if (sizeof(reason_phrase_1xx) > status_code) {
 			reason_phrase = reason_phrase_1xx[status_code];
-		if (NULL != reason_phrase && NULL != descr_size_ret)
+		}
+		if (NULL != reason_phrase &&
+		    NULL != descr_size_ret) {
 			(*descr_size_ret) = reason_phrase_size_1xx[status_code];
+		}
 	} else if (300 > status_code) { /* 200 - 299 */
 		status_code -= 200;
-		if (sizeof(reason_phrase_2xx) > status_code)
+		if (sizeof(reason_phrase_2xx) > status_code) {
 			reason_phrase = reason_phrase_2xx[status_code];
-		if (NULL != reason_phrase && NULL != descr_size_ret)
+		}
+		if (NULL != reason_phrase &&
+		    NULL != descr_size_ret) {
 			(*descr_size_ret) = reason_phrase_size_2xx[status_code];
+		}
 	} else if (400 > status_code) { /* 300 - 399 */
 		status_code -= 300;
-		if (sizeof(reason_phrase_3xx) > status_code)
+		if (sizeof(reason_phrase_3xx) > status_code) {
 			reason_phrase = reason_phrase_3xx[status_code];
-		if (NULL != reason_phrase && NULL != descr_size_ret)
+		}
+		if (NULL != reason_phrase &&
+		    NULL != descr_size_ret) {
 			(*descr_size_ret) = reason_phrase_size_3xx[status_code];
+		}
 	} else if (500 > status_code) { /* 400 - 499 */
 		status_code -= 400;
-		if (sizeof(reason_phrase_4xx) > status_code)
+		if (sizeof(reason_phrase_4xx) > status_code) {
 			reason_phrase = reason_phrase_4xx[status_code];
-		if (NULL != reason_phrase && NULL != descr_size_ret)
+		}
+		if (NULL != reason_phrase &&
+		    NULL != descr_size_ret) {
 			(*descr_size_ret) = reason_phrase_size_4xx[status_code];
+		}
 	} else if (600 > status_code) { /* 500 - 599 */
 		status_code -= 500;
-		if (sizeof(reason_phrase_5xx) > status_code)
+		if (sizeof(reason_phrase_5xx) > status_code) {
 			reason_phrase = reason_phrase_5xx[status_code];
-		if (NULL != reason_phrase && NULL != descr_size_ret)
+		}
+		if (NULL != reason_phrase &&
+		    NULL != descr_size_ret) {
 			(*descr_size_ret) = reason_phrase_size_5xx[status_code];
+		}
 	}
 	if (NULL == reason_phrase) {
 		reason_phrase = reason_phrase_none;
-		if (NULL != descr_size_ret)
+		if (NULL != descr_size_ret) {
 			(*descr_size_ret) = 0;
+		}
 	}
 	return (reason_phrase);
 }
 
 
-int
-http_get_method_fast(uint8_t *m, size_t m_size) {
+uint32_t
+http_get_method_fast(const uint8_t *m, size_t m_size) {
 
 	switch (m_size) {
 	case 3:
@@ -343,11 +359,41 @@ http_get_method_fast(uint8_t *m, size_t m_size) {
 	return (HTTP_REQ_METHOD_UNKNOWN);
 }
 
+int
+http_get_transfer_encoding_fast(uint8_t *c, size_t c_size) {
+
+	switch (c_size) {
+	case 4:
+		if (0 == mem_cmpi(c, HTTPTransferEncoding[HTTP_REQ_TE_GZIP], c_size))
+			return (HTTP_REQ_TE_GZIP);
+		return (HTTP_REQ_TE_UNKNOWN);
+	case 7:
+		switch ((*c)) {
+		case 'c':
+		case 'C':
+			if (0 == mem_cmpi(c, HTTPTransferEncoding[HTTP_REQ_TE_CHUNKED], c_size))
+				return (HTTP_REQ_TE_CHUNKED);
+			return (HTTP_REQ_TE_UNKNOWN);
+		case 'd':
+		case 'D':
+			if (0 == mem_cmpi(c, HTTPTransferEncoding[HTTP_REQ_TE_DEFLATE], c_size))
+				return (HTTP_REQ_TE_DEFLATE);
+			return (HTTP_REQ_TE_UNKNOWN);
+		}
+		return (HTTP_REQ_TE_UNKNOWN);
+	case 8:
+		if (0 == mem_cmpi(c, HTTPTransferEncoding[HTTP_REQ_TE_COMPRESS], c_size))
+			return (HTTP_REQ_TE_COMPRESS);
+		return (HTTP_REQ_TE_UNKNOWN);
+	}
+	return (HTTP_REQ_TE_UNKNOWN);
+}
+
 
 int
-http_req_sec_chk(uint8_t *http_hdr, size_t hdr_size, uint32_t method_code) {
+http_req_sec_chk(const uint8_t *http_hdr, size_t hdr_size, uint32_t method_code) {
 /* http://www.nestor.minsk.by/sr/2005/08/sr50806.html */
-	uint8_t *ptm, *hdr_max;
+	const uint8_t *ptm, *hdr_max;
 	size_t cl_count, te_count, tmp;
 
 	/*
@@ -365,37 +411,44 @@ http_req_sec_chk(uint8_t *http_hdr, size_t hdr_size, uint32_t method_code) {
 	/* 1, 2 */
 	hdr_max = (http_hdr + hdr_size);
 	for (ptm = http_hdr; ptm < hdr_max; ptm ++) {
-		if ((*ptm) > 126)
+		if (126 < (*ptm))
 			return (2); /* Control codes. */
-		if ((*ptm) == ' ' && (ptm + 1) < hdr_max && (*(ptm + 1)) == ':')
+		if (' ' == (*ptm) &&
+		    hdr_max > (ptm + 1) &&
+		    ':' == (*(ptm + 1)))
 			return (1); /* SP':' */
-		if ((*ptm) > 31 || (*ptm) == '\t')
+		if (31 < (*ptm) ||
+		    '\t' == (*ptm))
 			continue;
-		if ((*ptm) == '\r' && (ptm + 1) < hdr_max && (*(ptm + 1)) == '\n') {
-			ptm ++; /* Skeep CRLF. */
+		if ('\r' == (*ptm) &&
+		    hdr_max > (ptm + 1) &&
+		    '\n' == (*(ptm + 1))) {
+			ptm ++; /* Skip CRLF. */
 			continue;
 		}
 		return (2); /* Control codes. */
 	}
 	/* 3. */
-	tmp = http_hdr_val_get_count(http_hdr, hdr_size, (uint8_t*)"host", 4);
+	tmp = http_hdr_val_get_count(http_hdr, hdr_size, (const uint8_t*)"host", 4);
 	if (1 < tmp)
 		return (3);
 	/* 4. */
 	cl_count = http_hdr_val_get_count(http_hdr, hdr_size,
-	    (uint8_t*)"content-length", 14);
+	    (const uint8_t*)"content-length", 14);
 	if (1 < cl_count)
 		return (4);
 	/* 5. */
-	if (0 != cl_count && HTTP_REQ_METHOD_GET == method_code)
+	if (0 != cl_count &&
+	    HTTP_REQ_METHOD_GET == method_code)
 		return (5);
 	/* 6. */
 	te_count = http_hdr_val_get_count(http_hdr, hdr_size,
-	    (uint8_t*)"transfer-encoding", 17);
+	    (const uint8_t*)"transfer-encoding", 17);
 	if (1 < te_count)
 		return (6);
 	/* 7. */
-	if (0 != cl_count && 0 != te_count)
+	if (0 != cl_count &&
+	    0 != te_count)
 		return (7);
 	return (0);
 }
@@ -410,41 +463,42 @@ http_req_sec_chk(uint8_t *http_hdr, size_t hdr_size, uint32_t method_code) {
 /* Request-URI = "*" | absoluteURI | abs_path | authority */
 /* http_URL = "http:" "//" host [ ":" port ] [ abs_path [ "?" query ]] */
 int
-http_parse_req_line(uint8_t *http_hdr, size_t hdr_size, uint32_t flags,
+http_parse_req_line(const uint8_t *http_hdr, size_t hdr_size,
     http_req_line_data_p req_data) {
-	uint8_t *line, *ptm, *pspace;
+	const uint8_t *line, *ptm, *pspace;
 	size_t line_size, tm;
-	uint16_t wHi, wLo;
 
-	if (NULL == http_hdr || hdr_size <= 10 || NULL == req_data)
+	if (NULL == http_hdr || 10 >= hdr_size || NULL == req_data)
 		return (EINVAL);
-	if ('A' > (*http_hdr) || 'Z' < (*http_hdr))
+	if ('A' > (*http_hdr) ||
+	    'Z' < (*http_hdr))
 		return (EBADMSG);
-	memset(req_data, 0, sizeof(http_req_line_data_t));
+	mem_bzero(req_data, sizeof(http_req_line_data_t));
 	/* Look for end of req line. */
-	pspace = mem_find(0, http_hdr, hdr_size, CRLF, 2);
-	if (NULL == pspace)
+	pspace = mem_find_cstr(http_hdr, hdr_size, CRLF);
+	if (NULL == pspace) {
 		pspace = (http_hdr + hdr_size);
+	}
 
 	line = http_hdr;
-	line_size = (pspace - line); /* REQ_SIZE */
+	line_size = (size_t)(pspace - line); /* REQ_SIZE */
 	req_data->line_size = line_size;
 
 	/* Method. */
-	pspace = mem_find_byte(0, line, line_size, ' ');
+	pspace = mem_chr(line, line_size, ' ');
 	if (NULL == pspace)
 		return (EBADMSG);
 	req_data->method = line;
-	req_data->method_size = (pspace - line);
-	req_data->method_code = http_get_method_fast(line, (pspace - line));
+	req_data->method_size = (size_t)(pspace - line);
+	req_data->method_code = http_get_method_fast(line, (size_t)(pspace - line));
 
 	/* Request-URI. */
-	skeep_spwsp(pspace, (line_size - (pspace - line)), &ptm, NULL);
-	pspace = mem_find_byte((ptm - line), line, line_size, ' ');
+	skip_spwsp(pspace, (size_t)(line_size - (size_t)(pspace - line)), &ptm, NULL);
+	pspace = mem_chr_ptr(ptm, line, line_size, ' ');
 	if (NULL == pspace)
 		return (EBADMSG);
 	req_data->uri = ptm; /* Request-URI. */
-	req_data->uri_size = (pspace - req_data->uri); /* Request-URI SIZE. */
+	req_data->uri_size = (size_t)(pspace - req_data->uri); /* Request-URI SIZE. */
 	/* URI parsing. */
 	/* The authority form is only used by the CONNECT method. */
 	if (HTTP_REQ_METHOD_CONNECT == req_data->method_code) { /* authority = host[:port] */
@@ -452,59 +506,53 @@ http_parse_req_line(uint8_t *http_hdr, size_t hdr_size, uint32_t flags,
 		req_data->host_size = req_data->uri_size;
 	} else {
 		/* scheme, host, port */
-		ptm = mem_find(0, req_data->uri, req_data->uri_size, "://", 3);
+		ptm = mem_find_cstr(req_data->uri, req_data->uri_size, "://");
 		if (NULL != ptm) { /* scheme */
 			req_data->scheme = req_data->uri;
-			req_data->scheme_size = (ptm - req_data->scheme);
+			req_data->scheme_size = (size_t)(ptm - req_data->scheme);
 			/* host & port */
 			req_data->host = (ptm + 3);
-			ptm = mem_find_byte((req_data->host - req_data->uri),
+			ptm = mem_chr_ptr(req_data->host,
 			    req_data->uri, req_data->uri_size, '/');
-			if (NULL == ptm)
+			if (NULL == ptm) {
 				ptm = pspace; // = (req_data->uri + req_data->uri_size);
-			req_data->host_size = (ptm - req_data->host);
+			}
+			req_data->host_size = (size_t)(ptm - req_data->host);
 		} else {
 			ptm = req_data->uri;
 		}
 		/* abs_path */
-		/* Skeep slash~s from head. */
+		/* Skip slash~s from head. */
 		while (ptm < (pspace - 1) && '/' == ptm[1]) {
 			ptm ++;
 		}
 		req_data->abs_path = ptm;
-		ptm = mem_find_byte((req_data->abs_path - req_data->uri),
+		ptm = mem_chr_ptr(req_data->abs_path,
 		    req_data->uri, req_data->uri_size, '?');
 		if (NULL == ptm) {
 			/* Remove slash~s from tail. */
 			ptm = (pspace - 1);
-			while (req_data->abs_path < ptm && '/' == ptm[0])
+			while (req_data->abs_path < ptm && '/' == ptm[0]) {
 				ptm --;
-			req_data->abs_path_size = ((ptm + 1) - req_data->abs_path);
+			}
+			req_data->abs_path_size = (size_t)((ptm + 1) - req_data->abs_path);
 		} else {
-			req_data->abs_path_size = (ptm - req_data->abs_path);
+			req_data->abs_path_size = (size_t)(ptm - req_data->abs_path);
 			req_data->query = (ptm + 1);
-			req_data->query_size = (pspace - req_data->query);
+			req_data->query_size = (size_t)(pspace - req_data->query);
 		}
 	}
 
-	/* HTTP-Version. */
+	/* HTTP-Version: HTTP/H.L */
 	tm = 0;
-	skeep_spwsp(pspace, (line_size - (pspace - line)), &ptm, &tm);
-	if (6 > tm)
+	skip_spwsp(pspace, (size_t)(line_size - (size_t)(pspace - line)), &ptm, &tm);
+	if (8 > tm ||
+	    0 != memcmp("HTTP/", ptm, 5) ||
+	    ('0' > ptm[5] || '9' < ptm[5]) ||
+	    '.' != ptm[6] ||
+	    ('0' > ptm[7] || '9' < ptm[7]))
 		return (EBADMSG);
-	if (0 != memcmp("HTTP/", ptm, 5) ||
-	    ('0' > ptm[5] || '9' < ptm[5]))
-		return (EBADMSG);
-	ptm += 5;
-	pspace = mem_find_byte((ptm - line), line, line_size, '.');
-	if (NULL == pspace) { /* HTTP/1 */
-		wHi = UStr8ToUNum32(ptm, ((line + line_size) - ptm));
-		wLo = 0;
-	} else { /* HTTP/1.1 */
-		wHi = UStr8ToUNum32(ptm, (pspace - ptm));
-		wLo = UStr8ToUNum32(pspace, ((line + line_size) - pspace));
-	}
-	req_data->proto_ver = MAKEDWORD(wLo, wHi);
+	req_data->proto_ver = MAKEDWORD((ptm[7] - '0'), (ptm[5] - '0'));
 
 	return (0);
 }
@@ -515,95 +563,77 @@ http_parse_req_line(uint8_t *http_hdr, size_t hdr_size, uint32_t flags,
  * HTTP/1.1 206 Partial Content
  */
 int
-http_parse_resp_line(uint8_t *http_hdr, size_t hdr_size, uint32_t *ver,
-    uint32_t *status_code, uint8_t **reason_phrase, size_t *reason_phrase_size) {
-	uint8_t *resp, *cur_pos, *pspace;
-	size_t resp_size;
-	uint16_t wHi, wLo;
+http_parse_resp_line(const uint8_t *http_hdr, size_t hdr_size,
+    http_resp_line_data_p resp_data) {
+	const uint8_t *ptm;
 
-	if (NULL == http_hdr || 14 > hdr_size)
+	if (NULL == http_hdr || 14 > hdr_size || NULL == resp_data)
 		return (EINVAL);
-	resp = http_hdr;
-	cur_pos = resp;
-	if (0 != memcmp("HTTP/", cur_pos, 5) ||
-	    ('0' > cur_pos[5] || '9' < cur_pos[5]) ||
-	    '.' != cur_pos[6] ||
-	    ('0' > cur_pos[7] || '9' < cur_pos[7]))
+	if (0 != memcmp("HTTP/", http_hdr, 5) ||
+	    ('0' > http_hdr[ 5] || '9' < http_hdr[ 5]) ||
+	    '.' != http_hdr[ 6] ||
+	    ('0' > http_hdr[ 7] || '9' < http_hdr[ 7]) ||
+	    ' ' != http_hdr[ 8] ||
+	    ('0' > http_hdr[ 9] || '9' < http_hdr[ 9]) ||
+	    ('0' > http_hdr[10] || '9' < http_hdr[10]) ||
+	    ('0' > http_hdr[11] || '9' < http_hdr[11]) ||
+	    ' ' != http_hdr[12])
 		return (EBADMSG);
 
-	pspace = mem_find(0, http_hdr, hdr_size, CRLF, 2);
-	if (NULL == pspace)
-		pspace = (http_hdr + hdr_size);
-	resp_size = (pspace - resp); /* RESP_SIZE */
-
-	cur_pos += 5;
-	pspace = mem_find_byte((cur_pos - resp), resp, resp_size, '.');
-	if (NULL == pspace)
-		return (EBADMSG);
-
-	/* HTTP/X.x */
-	wHi = UStr8ToUNum32(cur_pos, (pspace - cur_pos));
-	cur_pos = (pspace + 1);
-	pspace = mem_find_byte((cur_pos - resp), resp, resp_size, ' ');
-	if (NULL == pspace)
-		return (EBADMSG);
-	/* HTTP/x.X */
-	wLo = UStr8ToUNum32(cur_pos, (pspace - cur_pos));
-	if (NULL != ver)
-		(*ver) = MAKEDWORD(wLo, wHi);
-	skeep_spwsp(pspace, (resp_size - (pspace - resp)), &cur_pos, NULL);
-	pspace = mem_find_byte((cur_pos - resp), resp, resp_size, ' ');
-	if (NULL == pspace)
-		return (EBADMSG);
-	/* Status-Code. */
-	if (NULL != status_code)
-		(*status_code) = UStr8ToUNum32(cur_pos, (pspace - cur_pos));
-	/* Reason-Phrase. */
-	if (NULL != reason_phrase || NULL != reason_phrase_size) {
-		skeep_spwsp(pspace, (resp_size - (pspace - resp)),
-		    (uint8_t**)&cur_pos, NULL);
-		if (NULL != reason_phrase)
-			(*reason_phrase) = cur_pos;
-		if (NULL != reason_phrase_size)
-			(*reason_phrase_size) = ((resp + resp_size) - cur_pos);
+	ptm = mem_find_cstr(http_hdr, hdr_size, CRLF);
+	if (NULL == ptm) {
+		ptm = (http_hdr + hdr_size);
 	}
+	resp_data->line_size = (size_t)(ptm - http_hdr); /* RESP_SIZE */;
+	/* HTTP/H.L */
+	resp_data->proto_ver = MAKEDWORD((http_hdr[7] - '0'), (http_hdr[5] - '0'));
+	/* Status-Code. */
+	resp_data->status_code = UStr8ToUNum32((http_hdr + 9), 3);
+	/* Reason-Phrase. */
+	resp_data->reason_phrase = (http_hdr + 13);
+	resp_data->reason_phrase_size = (size_t)(resp_data->line_size - 13);
+
 	return (0);
 }
 
 int
-skeep_spwsp(uint8_t *buf, size_t buf_size, uint8_t **buf_ret, size_t *buf_size_ret) {
-	uint8_t *buf_max;
+skip_spwsp(const uint8_t *buf, size_t buf_size,
+    const uint8_t **buf_ret, size_t *buf_size_ret) {
+	const uint8_t *buf_max;
 
 	if (NULL == buf && 0 != buf_size)
 		return (EINVAL);
 	buf_max = (buf + buf_size);
-	/* Skeep head spaces. */
+	/* Skip head spaces. */
 	for (; 33 > (*buf) && buf < buf_max; buf ++)
 		;
-	if (NULL != buf_ret)
+	if (NULL != buf_ret) {
 		(*buf_ret) = buf;
-	if (NULL != buf_size_ret)
-		(*buf_size_ret) = (buf_max - buf);
+	}
+	if (NULL != buf_size_ret) {
+		(*buf_size_ret) = (size_t)(buf_max - buf);
+	}
 	return (0);
 }
 int
-skeep_spwsp2(uint8_t *buf, size_t buf_size, uint8_t **buf_ret, size_t *buf_size_ret) {
-	uint8_t *buf_max;
+skip_spwsp2(const uint8_t *buf, size_t buf_size,
+    const uint8_t **buf_ret, size_t *buf_size_ret) {
+	const uint8_t *buf_max;
 
 	if (NULL == buf && 0 != buf_size)
 		return (EINVAL);
 	buf_max = (buf + buf_size - 1);
 	if (NULL != buf_ret) {
-		/* Skeep head spaces. */
+		/* Skip head spaces. */
 		for (; 33 > (*buf) && buf <= buf_max; buf ++)
 			;
 		(*buf_ret) = buf;
 	}
 	if (NULL != buf_size_ret) {
-		/* Skeep tail spaces. */
+		/* Skip tail spaces. */
 		for (; 33 > (*buf_max) && buf <= buf_max; buf_max --)
 			;
-		(*buf_size_ret) = ((buf_max + 1) - buf);
+		(*buf_size_ret) = (size_t)((buf_max + 1) - buf);
 	}
 	return (0);
 }
@@ -612,7 +642,8 @@ skeep_spwsp2(uint8_t *buf, size_t buf_size, uint8_t **buf_ret, size_t *buf_size_
 /* WSP->SP */
 /* LWS = [CRLF] 1*( SP | HT ) */
 int
-wsp2sp(uint8_t *buf, size_t buf_size, uint8_t *ret_buf, size_t *buf_size_ret) {
+wsp2sp(uint8_t *buf, size_t buf_size,
+    uint8_t *ret_buf, size_t *buf_size_ret) {
 	uint8_t *cur_rd_pos, *c_pos, *cur_wr_pos;
 	size_t copy_size, ret_size;
 
@@ -623,9 +654,9 @@ wsp2sp(uint8_t *buf, size_t buf_size, uint8_t *ret_buf, size_t *buf_size_ret) {
 	cur_wr_pos = ret_buf;
 	ret_size = 0;
 	for (;;) {
-		c_pos = mem_find((c_pos - buf), buf, (buf_size - 1), CRLF, 2);
+		c_pos = mem_find_ptr_cstr(c_pos, buf, (buf_size - 1), CRLF);
 		if (NULL == c_pos) {
-			copy_size = ((buf + buf_size) - cur_rd_pos);
+			copy_size = (size_t)((buf + buf_size) - cur_rd_pos);
 			ret_size += copy_size;
 			memmove(cur_wr_pos, cur_rd_pos, copy_size);
 			break;
@@ -635,7 +666,7 @@ wsp2sp(uint8_t *buf, size_t buf_size, uint8_t *ret_buf, size_t *buf_size_ret) {
 		 * <US-ASCII SP, space (32)> */
 		if ('\t' == (*c_pos) ||
 		    ' ' == (*c_pos)) {
-			copy_size = ((c_pos - 2) - cur_rd_pos);
+			copy_size = (size_t)((c_pos - 2) - cur_rd_pos);
 			c_pos ++;
 
 			ret_size += (copy_size + 1);
@@ -646,26 +677,30 @@ wsp2sp(uint8_t *buf, size_t buf_size, uint8_t *ret_buf, size_t *buf_size_ret) {
 			cur_rd_pos = c_pos;
 		}
 	}
-	if (NULL != buf_size_ret)
+	if (NULL != buf_size_ret) {
 		(*buf_size_ret) = ret_size;
+	}
 	return (0);
 }
 
 
 /* Replace: HT->SP */
 int
-ht2sp(uint8_t *buf, size_t buf_size, uint8_t *ret_buf, size_t *buf_size_ret) {
+ht2sp(uint8_t *buf, size_t buf_size,
+    uint8_t *ret_buf, size_t *buf_size_ret) {
 	uint8_t *c_pos;
 
 	if (NULL == buf || 0 == buf_size || NULL == ret_buf)
 		return (EINVAL);
-	if (buf != ret_buf)
+	if (buf != ret_buf) {
 		memmove(ret_buf, buf, buf_size);
-	if (NULL != buf_size_ret)
+	}
+	if (NULL != buf_size_ret) {
 		(*buf_size_ret) = buf_size;
+	}
 	c_pos = buf;
 	for (;;) {
-		c_pos = mem_find_byte((c_pos - buf), buf, buf_size, '\t'); /* TAB */
+		c_pos = mem_chr_ptr(c_pos, buf, buf_size, '\t'); /* TAB */
 		if (NULL == c_pos)
 			break;
 		(*c_pos) = ' '; /* SPace */
@@ -676,29 +711,29 @@ ht2sp(uint8_t *buf, size_t buf_size, uint8_t *ret_buf, size_t *buf_size_ret) {
 
 
 int
-http_hdr_val_get_ex(uint8_t *http_hdr, size_t hdr_size, const uint8_t *val_name,
-    size_t val_name_size, size_t offset,
-    uint8_t **val_ret, size_t *val_ret_size, size_t *offset_next) {
-	uint8_t *name, *val, *separator, *http_hdr_end;
+http_hdr_val_get_ex(const uint8_t *http_hdr, size_t hdr_size,
+    const uint8_t *val_name, size_t val_name_size, size_t offset,
+    const uint8_t **val_ret, size_t *val_ret_size, size_t *offset_next) {
+	const uint8_t *http_hdr_end, *name, *val, *separator;
 
 	if ((NULL == http_hdr && 0 != hdr_size) ||
 	    (NULL == val_name && 0 != val_name_size))
 		return (EINVAL);
-	/* Skeep first line with request/responce / offset=prev fields. */
-	name = mem_find(offset, http_hdr, hdr_size, CRLF, 2);
+	/* Skip first line with request/responce / offset=prev fields. */
+	name = mem_find_off_cstr(offset, http_hdr, hdr_size, CRLF);
 	http_hdr_end = (http_hdr + hdr_size);
 	for (; NULL != name; name = separator) {
-		name += 2; /* 2 = separator=CRLF skeep. */
+		name += 2; /* 2 = separator=CRLF skip. */
 		/* ':' - after value name. */
-		val = mem_find_byte((name - http_hdr), http_hdr, hdr_size, ':');
+		val = mem_chr_ptr(name, http_hdr, hdr_size, ':');
 		if (NULL == val)
 			return (ESPIPE);
 		val ++; /* Move ptr from ':' to first value byte. */
 		/* Search for value end / next field name start,
-		 * skeep all LWS = [CRLF] 1*( SP | HT )	*/
+		 * skip all LWS = [CRLF] 1*( SP | HT )	*/
 		for (separator = val;; separator += 2) {
-			separator = mem_find((separator - http_hdr), http_hdr,
-			    hdr_size, CRLF, 2);
+			separator = mem_find_ptr_cstr(separator, http_hdr,
+			    hdr_size, CRLF);
 			if (NULL == separator) {
 				separator = http_hdr_end;
 				break;
@@ -711,34 +746,38 @@ http_hdr_val_get_ex(uint8_t *http_hdr, size_t hdr_size, const uint8_t *val_name,
 			break;
 		}
 		/* Compare val_name and data beetween [CRLF] and ':' */
-		if (0 != buf_cmpi(name, ((val - name) - 1), val_name, val_name_size))
+		if (0 != mem_cmpin(name, (size_t)((val - name) - 1),
+		    val_name, val_name_size))
 			continue;
 		/* Found! */
-		skeep_spwsp2(val, (separator - val), val_ret, val_ret_size);
-		if (NULL != offset_next)
-			(*offset_next) = (separator - http_hdr);
+		skip_spwsp2(val, (size_t)(separator - val), val_ret, val_ret_size);
+		if (NULL != offset_next) {
+			(*offset_next) = (size_t)(separator - http_hdr);
+		}
 		return (0);
 	}
 	return (ESPIPE);
 }
 
 int
-http_hdr_val_get(uint8_t *http_hdr, size_t hdr_size, const uint8_t *val_name,
-    size_t val_name_size, uint8_t **val_ret, size_t *val_ret_size) {
+http_hdr_val_get(const uint8_t *http_hdr, size_t hdr_size,
+    const uint8_t *val_name, size_t val_name_size,
+    const uint8_t **val_ret, size_t *val_ret_size) {
 
-	return (http_hdr_val_get_ex(http_hdr, hdr_size, val_name, val_name_size, 0,
-	    val_ret, val_ret_size, NULL));
+	return (http_hdr_val_get_ex(http_hdr, hdr_size,
+	    val_name, val_name_size, 0, val_ret, val_ret_size, NULL));
 }
 
 
 size_t
-http_hdr_val_get_count(uint8_t *http_hdr, size_t hdr_size, const uint8_t *val_name,
-    size_t val_name_size) {
+http_hdr_val_get_count(const uint8_t *http_hdr, size_t hdr_size,
+    const uint8_t *val_name, size_t val_name_size) {
 	size_t offset = 0, ret = 0;
 
 	while (0 == http_hdr_val_get_ex(http_hdr, hdr_size,
-	    val_name, val_name_size, offset, NULL, NULL, &offset))
+	    val_name, val_name_size, offset, NULL, NULL, &offset)) {
 		ret ++;/* Found! */
+	}
 	return (ret);
 }
 
@@ -755,47 +794,48 @@ http_hdr_val_remove(uint8_t *http_hdr, uint8_t *hdr_lcase, size_t hdr_size,
 		return (0);
 	val = hdr_lcase;
 	hdr_lcase_end = (hdr_lcase + hdr_size);
-	while (NULL != val) {
-		val = mem_find((val - hdr_lcase), hdr_lcase, hdr_size, val_name,
-		    val_name_size);
+	for (;;) {
+		val = mem_find_ptr(val, hdr_lcase, hdr_size, val_name, val_name_size);
 		if (NULL == val)
 			break;
-
 		if (':' == (*((uint8_t*)(val + val_name_size))) &&
 		    (val == hdr_lcase || ((val > (hdr_lcase + 2)) &&
 		    0 == memcmp(CRLF, (val - 2), 2)))) {
 			ret ++;
-			val_end = mem_find(((val + val_name_size + 1) - hdr_lcase),
-			    hdr_lcase, hdr_size, CRLF, 2);
+			val_end = mem_find_ptr_cstr((val + val_name_size + 1),
+			    hdr_lcase, hdr_size, CRLF);
 			if (NULL != val_end) {
 				val_end += 2;
 			} else {
-				val_end = mem_find(((val + val_name_size + 1) -
-				    hdr_lcase), hdr_lcase, hdr_size, LF, 1);
+				val_end = mem_chr_ptr((val + val_name_size + 1),
+				    hdr_lcase, hdr_size, '\n'); /* LF */
 				if (NULL != val_end) {
 					val_end ++;
 				} else {
 					val_end = hdr_lcase_end;
-					if (((val > (hdr_lcase + 2)) &&
-					    0 == memcmp(CRLF, (val - 2), 2)))
+					if (val > (hdr_lcase + 2) &&
+					    0 == memcmp(CRLF, (val - 2), 2)) {
 						val -= 2; /* Remove CRLF at the end. */
+					}
 				}
 			}
-			val_size = (val_end - val);
+			val_size = (size_t)(val_end - val);
 
-			memmove(val, (val + val_size), (hdr_lcase_end - val_end));
-			if (NULL != http_hdr)
+			memmove(val, (val + val_size), (size_t)(hdr_lcase_end - val_end));
+			if (NULL != http_hdr) {
 				memmove((http_hdr + (val - hdr_lcase)),
 				    ((http_hdr + (val - hdr_lcase)) + val_size),
-				    (hdr_lcase_end - val_end));
+				    (size_t)(hdr_lcase_end - val_end));
+			}
 			hdr_lcase_end -= val_size;
 			hdr_size -= val_size;
 		} else {
 			val ++;
 		}
 	}
-	if (NULL != phdr_size)
+	if (NULL != phdr_size) {
 		(*phdr_size) = hdr_size;
+	}
 	return (ret);
 }
 
@@ -809,62 +849,69 @@ http_hdr_vals_remove(uint8_t *http_hdr, uint8_t *hdr_lcase, size_t hdr_size,
 	    0 == vals_count || NULL == pvals_name || NULL == pvals_name_size)
 		return (0);
 	for (i = 0; i < vals_count; i ++) {
-		ret += http_hdr_val_remove(http_hdr, hdr_lcase, hdr_size, &hdr_size,
-		    pvals_name[i], pvals_name_size[i]);
+		ret += http_hdr_val_remove(http_hdr, hdr_lcase, hdr_size,
+		    &hdr_size, pvals_name[i], pvals_name_size[i]);
 	}
-	if (NULL != phdr_size)
+	if (NULL != phdr_size) {
 		(*phdr_size) = hdr_size;
+	}
 	return (ret);
 }
 
 
 /* Get: [&]val_name=val[&] */
 int
-http_query_val_get_ex(uint8_t *query, size_t query_size,
+http_query_val_get_ex(const uint8_t *query, size_t query_size,
     const uint8_t *val_name, size_t val_name_size,
-    uint8_t **val_name_ret, uint8_t **val_ret, size_t *val_ret_size) {
-	uint8_t *val, *val_end, *query_max;
+    const uint8_t **val_name_ret, const uint8_t **val_ret, size_t *val_ret_size) {
+	const uint8_t *val, *val_end, *query_max;
 
 	if ((NULL == query && 0 != query_size) ||
 	    (NULL == val_name && 0 != val_name_size))
 		return (EINVAL);
 	val = query;
 	query_max = (query + query_size);
-	while (query_max > val && '&' == (*val))
-		val ++; /* Skeep '&' in buf start. */
+	while (query_max > val && '&' == (*val)) {
+		val ++; /* Skip '&' in buf start. */
+	}
 	for (;;) {
-		val_end = mem_find_byte(((val - query) + 1), query, query_size, '=');
+		val_end = mem_chr_ptr((val + 1), query, query_size, '=');
 		if (NULL == val_end)
 			return (ESPIPE);
 		/* Compare val_name and data beetween ['&'] and '=' */
-		if (0 == buf_cmpi(val, (val_end - val), val_name, val_name_size)) {
+		if (0 == mem_cmpin(val, (size_t)(val_end - val),
+		    val_name, val_name_size)) {
 			/* Found! */
-			if (NULL != val_name_ret)
+			if (NULL != val_name_ret) {
 				(*val_name_ret) = val;
+			}
 			val = (val_end + 1);
-			val_end = mem_find_byte((val - query), query, query_size, '&');
-			if (NULL == val_end)
+			val_end = mem_chr_ptr(val, query, query_size, '&');
+			if (NULL == val_end) {
 				val_end = query_max;
-			if (NULL != val_ret)
+			}
+			if (NULL != val_ret) {
 				(*val_ret) = val;
-			if (NULL != val_ret_size)
-				(*val_ret_size) = (val_end - val);
+			}
+			if (NULL != val_ret_size) {
+				(*val_ret_size) = (size_t)(val_end - val);
+			}
 			return (0);
 		}
-		val = mem_find_byte((val_end - query), query,
-		    query_size, '&');
+		val = mem_chr_ptr(val_end, query, query_size, '&');
 		if (NULL == val)
 			return (ESPIPE);
-		while (query_max > val && '&' == (*val))
+		while (query_max > val && '&' == (*val)) {
 			val ++;
+		}
 	}
 	return (ESPIPE);
 }
 
 int
-http_query_val_get(uint8_t *query, size_t query_size,
-    const uint8_t *val_name, size_t val_name_size, uint8_t **val_ret,
-    size_t *val_ret_size) {
+http_query_val_get(const uint8_t *query, size_t query_size,
+    const uint8_t *val_name, size_t val_name_size,
+    const uint8_t **val_ret, size_t *val_ret_size) {
 
 	return (http_query_val_get_ex(query, query_size, val_name,
 	    val_name_size, NULL, val_ret, val_ret_size));
@@ -873,7 +920,7 @@ http_query_val_get(uint8_t *query, size_t query_size,
 size_t
 http_query_val_del(uint8_t *query, size_t query_size, const uint8_t *val_name,
     size_t val_name_size, size_t *query_size_ret) {
-	uint8_t *val_name_pos, *val_data, *val_data_end, *query_max;
+	const uint8_t *val_data, *val_data_end, *query_max, *val_name_pos;
 	size_t val_data_size;
 	size_t del_cnt = 0;
 
@@ -882,22 +929,28 @@ http_query_val_del(uint8_t *query, size_t query_size, const uint8_t *val_name,
 		query_max = (query + query_size);
 		val_data_end = (val_data + val_data_size);
 		/* Move to buf start (remove all '&' before value name). */
-		while (val_name_pos > query && '&' == (*(val_name_pos - 1)))
+		while (val_name_pos > query && '&' == (*(val_name_pos - 1))) {
 			val_name_pos --;
+		}
 		/* Move to buf end (remove all '&' after value data). */
-		while (query_max > val_data_end && '&' == (*val_data_end))
+		while (query_max > val_data_end && '&' == (*val_data_end)) {
 			val_data_end ++;
+		}
 		/* Copy '&' after value data if remove not from buf start / end. */
-		if (val_name_pos != query && query_max != val_data_end)
+		if (val_name_pos != query &&
+		    query_max != val_data_end) {
 			val_data_end --; /* Safe '&' */
+		}
 		/* Move all data after value data to value name start. */
-		memmove(val_name_pos, val_data_end, (query_max - val_data_end));
+		memmove(MK_RW_PTR(val_name_pos), val_data_end,
+		    (size_t)(query_max - val_data_end));
 		/* val_data_end - val_name_pos = val_name_size + 1 + val_data_size */
-		query_size -= (val_data_end - val_name_pos);
+		query_size -= (size_t)(val_data_end - val_name_pos);
 		del_cnt ++;
 	}
-	if (NULL != query_size_ret)
+	if (NULL != query_size_ret) {
 		(*query_size_ret) = query_size;
+	}
 	return (del_cnt);
 }
 
@@ -907,9 +960,10 @@ http_query_val_del(uint8_t *query, size_t query_size, const uint8_t *val_name,
  * HexNum
  */
 int
-http_data_decode_chunked(uint8_t *data, size_t data_size, uint8_t **data_ret,
-    size_t *data_ret_size) {
-	uint8_t *cur_pos, *end_line, *cur_wr_pos, *max_pos;
+http_data_decode_chunked(uint8_t *data, size_t data_size,
+    uint8_t **data_ret, size_t *data_ret_size) {
+	uint8_t *cur_pos, *end_line, *max_pos;
+	uint8_t *cur_wr_pos;
 	size_t ret_size, tm;
 
 	cur_pos = data;
@@ -917,14 +971,14 @@ http_data_decode_chunked(uint8_t *data, size_t data_size, uint8_t **data_ret,
 	ret_size = 0;
 	cur_wr_pos = NULL;
 	for (;;) {
-		end_line = mem_find((cur_pos - data), data, data_size, CRLF, 2);
+		end_line = mem_find_ptr_cstr(cur_pos, data, data_size, CRLF);
 		if (NULL == end_line) {
 			end_line = (data + data_size);
-			if (0 != UStr8HexToUNum(cur_pos, (max_pos - cur_pos)))
+			if (0 != UStr8HexToUNum(cur_pos, (size_t)(max_pos - cur_pos)))
 				return (EINVAL);
 			break; /* Normal exit. */
 		}
-		tm = UStr8HexToUNum(cur_pos, (end_line - cur_pos));
+		tm = UStr8HexToUNum(cur_pos, (size_t)(end_line - cur_pos));
 		if (0 == tm)
 			break; /* Normal exit. */
 		cur_pos = (end_line + 2 + tm);

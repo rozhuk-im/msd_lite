@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012 - 2014 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2012 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,8 +37,8 @@
 #include <sys/param.h>
 
 #ifdef __linux__ /* Linux specific code. */
-#define _GNU_SOURCE /* See feature_test_macros(7) */
-#define __USE_GNU 1
+#	define _GNU_SOURCE /* See feature_test_macros(7) */
+#	define __USE_GNU 1
 #endif /* Linux specific code. */
 
 #include <sys/types.h>
@@ -49,8 +49,8 @@
 #include <string.h> /* bcopy, bzero, memcpy, memmove, memset, strerror... */
 #include <errno.h>
 
-#include "core_macro.h"
-#include "core_helpers.h"
+#include "macro_helpers.h"
+#include "mem_helpers.h"
 #include "core_net_helpers.h"
 #ifdef DEBUG
 #include "core_log.h"
@@ -69,8 +69,9 @@ static inline size_t
 r_buf_iovec_calc_size(iovec_p iov, size_t iov_cnt) {
 	register size_t i, ret = 0;
 
-	for (i = 0; i < iov_cnt; i ++)
+	for (i = 0; i < iov_cnt; i ++) {
 		ret += iov[i].iov_len;
+	}
 	return (ret);
 }
 
@@ -102,8 +103,9 @@ iovec_aggregate_ex(iovec_p iov, size_t iov_cnt, size_t data_size, size_t off,
 	if (0 == iov_cnt || 0 == ret_cnt || 0 == data_size ||
 	    (iov[0].iov_len - off) >= data_size ||
 	    (1 == iov_cnt && 0 == (iov[0].iov_len - off))) {
-		if (NULL != reminder_data_size_ret)
+		if (NULL != reminder_data_size_ret) {
 			(*reminder_data_size_ret) = 0;
+		}
 		return (0);
 	}
 	ret_cnt --;
@@ -120,9 +122,91 @@ iovec_aggregate_ex(iovec_p iov, size_t iov_cnt, size_t data_size, size_t off,
 			ret[j] = iov[i];
 		}
 	}
-	if (NULL != reminder_data_size_ret)
+	if (NULL != reminder_data_size_ret) {
 		(*reminder_data_size_ret) = data_size;
+	}
 	return ((j + 1));
+}
+
+
+int
+r_buf_rpos_cmp(r_buf_rpos_p rpos1, r_buf_rpos_p rpos2) {
+
+	if (rpos1 == rpos2)
+		return (0);
+	if (NULL == rpos1)
+		return (-127);
+	if (NULL == rpos2)
+		return (127);
+
+	if (rpos1->round_num == rpos2->round_num) {
+		if (rpos1->iov_index == rpos2->iov_index) {
+			if (rpos1->iov_off == rpos2->iov_off)
+				return (0);
+			if (rpos1->iov_off > rpos2->iov_off)
+				return (1);
+			return (-1); /* rpos1->iov_off < rpos2->iov_off */
+		}
+		if (rpos1->iov_index > rpos2->iov_index)
+			return (1);
+		return (-1); /* rpos1->iov_index < rpos2->iov_index */
+	}
+	if (rpos1->round_num > rpos2->round_num)
+		return (1);
+	return (-1); /* rpos1->round_num < rpos2->round_num */
+}
+
+size_t
+r_buf_rpos_calc_size(r_buf_p r_buf, r_buf_rpos_p rpos1, r_buf_rpos_p rpos2) {
+	size_t ret;
+	r_buf_rpos_p rpos_lo = NULL, rpos_hi = NULL;
+
+	if (NULL == r_buf || NULL == rpos1 || NULL == rpos2)
+		return (0);
+	if (0 == r_buf_rpos_check_fast(r_buf, rpos1) ||
+	    0 == r_buf_rpos_check_fast(r_buf, rpos2))
+		return (0);
+
+	switch (r_buf_rpos_cmp(rpos1, rpos2)) {
+	case 0:
+		return (0);
+	case -1:
+		rpos_lo = rpos1;
+		rpos_hi = rpos2;
+		break;
+	case 1:
+		rpos_lo = rpos2;
+		rpos_hi = rpos1;
+		break;
+	}
+
+	if (rpos_lo->round_num == rpos_hi->round_num) {
+		if (rpos_lo->iov_index == rpos_hi->iov_index) /* Optimized size calculation. */
+			return (0);
+		if (RBUF_F_FRAG & r_buf->flags) {
+			ret = r_buf_iovec_calc_size(&r_buf->iov[rpos_lo->iov_index],
+			    (1 + rpos_hi->iov_index - rpos_lo->iov_index));
+		} else { /* Optimized size calculation. */
+			ret = (size_t)((r_buf->iov[rpos_hi->iov_index].iov_base +
+			    r_buf->iov[rpos_hi->iov_index].iov_len) -
+			    r_buf->iov[rpos_lo->iov_index].iov_base);
+		}
+	} else {
+		if (RBUF_F_FRAG & r_buf->flags) {
+			ret = r_buf_iovec_calc_size(&r_buf->iov[rpos_lo->iov_index],
+			    (1 + r_buf->iov_index_max - rpos_lo->iov_index));
+			ret += r_buf_iovec_calc_size(r_buf->iov, (1 + rpos_hi->iov_index));
+		} else { /* Optimized size calculation. */
+			ret = (size_t)((r_buf->iov[r_buf->iov_index_max].iov_base +
+			    r_buf->iov[r_buf->iov_index_max].iov_len) -
+			    r_buf->iov[rpos_lo->iov_index].iov_base);
+			ret += (size_t)((r_buf->iov[rpos_hi->iov_index].iov_base +
+			    r_buf->iov[rpos_hi->iov_index].iov_len) -
+			    r_buf->buf);
+		}
+	}
+
+	return (ret);
 }
 
 
@@ -155,12 +239,72 @@ r_buf_rpos_init(r_buf_p r_buf, r_buf_rpos_p rpos, size_t data_size) {
 }
 
 int
+r_buf_rpos_init_near(r_buf_p r_buf, r_buf_rpos_p rpos, size_t data_size,
+    r_buf_rpos_p rposs, size_t rposs_cnt) {
+	int error, cmp;
+	size_t i, dsize_lo, dsize_hi;
+	
+	if (1 == rposs_cnt) {
+		memcpy(rpos, &rposs[0], sizeof(r_buf_rpos_t));
+		return (0);
+	}
+	error = r_buf_rpos_init(r_buf, rpos, data_size);
+	if (0 != error ||
+	    0 == rposs_cnt) /* No error in this case. */
+		return (error);
+
+	for (i = 1; i < rposs_cnt; i ++) {
+		cmp = r_buf_rpos_cmp(rpos, &rposs[i]);
+		if (0 == cmp)
+			return (0); /* No need to find near index. */
+		if (0 > cmp)
+			break;
+	}
+	/* Select nearest index. */
+	dsize_lo = (data_size - r_buf_data_avail_size(r_buf, &rposs[(i - 1)], NULL));
+	dsize_hi = (r_buf_data_avail_size(r_buf, &rposs[i], NULL) - data_size);
+	if (dsize_lo < dsize_hi) {
+		memcpy(rpos, &rposs[(i - 1)], sizeof(r_buf_rpos_t));
+	} else {
+		memcpy(rpos, &rposs[i], sizeof(r_buf_rpos_t));
+	}
+
+	return (0);
+}
+
+int
+r_buf_rpos_check_fast(r_buf_p r_buf, r_buf_rpos_p rpos) {
+
+	/* Reader at current round, ckecks. */
+	if (rpos->round_num == r_buf->round_num) {
+		if (rpos->iov_index <= (r_buf->iov_index + 1)) /* See: r_buf_rpos_index_inc() */
+			return (1); /* OK: in range. */
+		/* rpos > wpos */
+		return (0); /* No data to read, no dropped. */
+	}
+	/* Reader at pevious round, ckecks. */
+	if (((size_t)(rpos->round_num + 1)) == r_buf->round_num) {
+		/* (rpos->round_num + 1) == 0 in some cases! */
+		if (rpos->iov_index > r_buf->iov_index_max) {
+			/* Reader out of buf range in previous round - normal. */
+			return (1); /* OK: fixed. */
+		}
+		if (rpos->iov_index > r_buf->iov_index)
+			return (1); /* OK: in range. */
+		/* Out of range: slow reader. */
+		return (0);
+	}
+	/* Some data lost for this receiver. */
+	return (0);
+}
+int
 r_buf_rpos_check(r_buf_p r_buf, r_buf_rpos_p rpos, size_t *drop_size_ret) {
 	size_t drop_size;
 
 	/* Paranoid check. */
-	if (r_buf->iov[rpos->iov_index].iov_len <= rpos->iov_off)
+	if (r_buf->iov[rpos->iov_index].iov_len <= rpos->iov_off) {
 		rpos->iov_off = 0;
+	}
 	/* Reader at current round, ckecks. */
 	if (rpos->round_num == r_buf->round_num) {
 		if (rpos->iov_index <= (r_buf->iov_index + 1)) /* See: r_buf_rpos_index_inc() */
@@ -168,8 +312,9 @@ r_buf_rpos_check(r_buf_p r_buf, r_buf_rpos_p rpos, size_t *drop_size_ret) {
 		/* rpos > wpos */
 		rpos->iov_off = 0;
 		rpos->iov_index = (r_buf->iov_index + 1);
-		if (NULL != drop_size_ret)
+		if (NULL != drop_size_ret) {
 			(*drop_size_ret) = 0;
+		}
 		return (0); /* No data to read, no dropped. */
 	}
 	/* Reader at pevious round, ckecks. */
@@ -186,9 +331,10 @@ r_buf_rpos_check(r_buf_p r_buf, r_buf_rpos_p rpos, size_t *drop_size_ret) {
 			return (1); /* OK: in range. */
 		/* Out of range: slow reader. */
 		drop_size = (r_buf->size + r_buf_iovec_calc_size(&r_buf->iov[rpos->iov_index],
-			    (1 + r_buf->iov_index - rpos->iov_index)));
-		if (NULL != drop_size_ret)
+		    (1 + r_buf->iov_index - rpos->iov_index)));
+		if (NULL != drop_size_ret) {
 			(*drop_size_ret) = drop_size;
+		}
 		return (0);
 	}
 	/* Some data lost for this receiver. */
@@ -208,8 +354,9 @@ r_buf_rpos_check(r_buf_p r_buf, r_buf_rpos_p rpos, size_t *drop_size_ret) {
 	rpos->iov_off = 0;
 	rpos->iov_index = (r_buf->iov_index + 1);
 	rpos->round_num = r_buf->round_num;
-	if (NULL != drop_size_ret)
+	if (NULL != drop_size_ret) {
 		(*drop_size_ret) = drop_size;
+	}
 	return (0);
 }
 
@@ -224,22 +371,22 @@ r_buf_alloc(uintptr_t fd, size_t size, size_t min_block_size) {
 	r_buf = zalloc(sizeof(r_buf_t));
 	if (NULL == r_buf)
 		return (NULL);
-	page_size = sysconf(_SC_PAGE_SIZE);
+	page_size = (size_t)sysconf(_SC_PAGE_SIZE);
 	//r_buf->size = ALIGNEX((size + min_block_size), page_size); /* XXX: Minimum buf. */
 	//while (r_buf->size > size)
 	//	r_buf->size -= page_size;
 	r_buf->size = size;
-	//LOGD_EV_FMT("mmalloc_fd: size = %zu, r_buf->size = %zu", size, r_buf->size);
-	r_buf->buf = mmalloc_fd(fd, r_buf->size);
+	//LOGD_EV_FMT("mapalloc_fd: size = %zu, r_buf->size = %zu", size, r_buf->size);
+	r_buf->buf = mapalloc_fd(fd, r_buf->size);
 	if (NULL == r_buf->buf) {
-		//LOGD_ERR(errno, "mmalloc 1");
+		//LOGD_ERR(errno, "mapalloc 1");
 		goto err_out;
 	}
 	r_buf->iov_count = ((r_buf->size / min_block_size) + 32);
 	r_buf->iov_size = ALIGNEX((sizeof(iovec_t) * r_buf->iov_count), page_size);
-	r_buf->iov = mmalloc(r_buf->iov_size);
+	r_buf->iov = mapalloc(r_buf->iov_size);
 	if (NULL == r_buf->iov) {
-		//LOGD_ERR(errno, "mmalloc 2");
+		//LOGD_ERR(errno, "mapalloc 2");
 		goto err_out;
 	}
 	//r_buf->iov_index = ~0; /* r_buf_wbuf_get() increment this, set to: -1. */
@@ -258,11 +405,13 @@ r_buf_free(r_buf_p r_buf) {
 
 	if (NULL == r_buf)
 		return;
-	if (NULL != r_buf->buf)
-		mmfree(r_buf->buf, r_buf->size);
-	if (NULL != r_buf->iov)
-		mmfree(r_buf->iov, r_buf->iov_size);
-	memfilld(r_buf, sizeof(r_buf_t));
+	if (NULL != r_buf->buf) {
+		mapfree(r_buf->buf, r_buf->size);
+	}
+	if (NULL != r_buf->iov) {
+		mapfree(r_buf->iov, r_buf->iov_size);
+	}
+	mem_filld(r_buf, sizeof(r_buf_t));
 	free(r_buf);
 }
 
@@ -350,7 +499,7 @@ r_buf_wbuf_set(r_buf_p r_buf, size_t offset, size_t buf_size) {
 }
 
 int
-r_buf_wbuf_set2(r_buf_p r_buf, uint8_t *buf, size_t buf_size, size_t *iov_index) {
+r_buf_wbuf_set2(r_buf_p r_buf, uint8_t *buf, size_t buf_size, r_buf_rpos_p rpos) {
 	uint8_t *buf_end;
 
 	if (NULL == r_buf || NULL == buf)
@@ -367,11 +516,14 @@ r_buf_wbuf_set2(r_buf_p r_buf, uint8_t *buf, size_t buf_size, size_t *iov_index)
 	}
 	r_buf->iov[r_buf->iov_index].iov_base = buf;
 	r_buf->iov[r_buf->iov_index].iov_len = buf_size;
-	r_buf->wpos = (buf_end - r_buf->buf);
+	r_buf->wpos = (size_t)(buf_end - r_buf->buf);
 	r_buf->iov_index_max = max(r_buf->iov_index_max, r_buf->iov_index);
 
-	if (NULL != iov_index)
-		(*iov_index) = r_buf->iov_index;
+	if (NULL != rpos) {
+		rpos->iov_index = r_buf->iov_index;
+		rpos->iov_off = 0;
+		rpos->round_num = r_buf->round_num;
+	}
 	// XXX!!!
 	r_buf->iov_index ++;
 	r_buf->iov[r_buf->iov_index].iov_base = buf_end;
@@ -425,8 +577,8 @@ r_buf_data_avail_size(r_buf_p r_buf, r_buf_rpos_p rpos, size_t *drop_size_ret) {
 			ret = r_buf_iovec_calc_size(&r_buf->iov[rpos->iov_index],
 			    (1 + r_buf->iov_index - rpos->iov_index));
 		} else { /* Optimized size calculation. */
-			ret = (r_buf->wpos -
-			    (r_buf->iov[rpos->iov_index].iov_base - r_buf->buf));
+			ret = (size_t)(r_buf->wpos -
+			    (size_t)(r_buf->iov[rpos->iov_index].iov_base - r_buf->buf));
 		}
 	} else {
 		if (RBUF_F_FRAG & r_buf->flags) {
@@ -434,7 +586,7 @@ r_buf_data_avail_size(r_buf_p r_buf, r_buf_rpos_p rpos, size_t *drop_size_ret) {
 			    (1 + r_buf->iov_index_max - rpos->iov_index));
 			ret += r_buf_iovec_calc_size(r_buf->iov, (1 + r_buf->iov_index));
 		} else { /* Optimized size calculation. */
-			ret = ((r_buf->iov[r_buf->iov_index_max].iov_base +
+			ret = (size_t)((r_buf->iov[r_buf->iov_index_max].iov_base +
 			    r_buf->iov[r_buf->iov_index_max].iov_len) -
 			    r_buf->iov[rpos->iov_index].iov_base);
 			ret += r_buf->wpos;
@@ -442,8 +594,9 @@ r_buf_data_avail_size(r_buf_p r_buf, r_buf_rpos_p rpos, size_t *drop_size_ret) {
 	}
 	ret -= rpos->iov_off;
 return_ok:
-	if (NULL != drop_size_ret)
+	if (NULL != drop_size_ret) {
 		(*drop_size_ret) = 0;
+	}
 	return (ret);
 }
 
@@ -476,10 +629,12 @@ r_buf_data_get(r_buf_p r_buf, r_buf_rpos_p rpos, size_t data_size,
 		    tm, 0, &iov[ret], (iov_cnt - ret), &tm);
 	}
 return_ok:
-	if (NULL != drop_size_ret)
+	if (NULL != drop_size_ret) {
 		(*drop_size_ret) = 0;
-	if (NULL != data_size_ret)
+	}
+	if (NULL != data_size_ret) {
 		(*data_size_ret) = (data_size - tm);
+	}
 	return (ret);
 }
 

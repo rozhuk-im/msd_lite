@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012 - 2014 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2012 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,8 +39,8 @@
 #include <sys/param.h>
 
 #ifdef __linux__ /* Linux specific code. */
-#define _GNU_SOURCE /* See feature_test_macros(7) */
-#define __USE_GNU 1
+#	define _GNU_SOURCE /* See feature_test_macros(7) */
+#	define __USE_GNU 1
 #endif /* Linux specific code. */
 
 #include <sys/types.h>
@@ -48,47 +48,45 @@
 #include <inttypes.h>
 
 #ifdef _KERNEL /* Kernel space */
-#include <sys/errno.h>
-#include <sys/systm.h>
-#include <sys/kernel.h>
-#include <sys/malloc.h>
-#include <sys/lock.h>
-#include <sys/mutex.h>
+#	include <sys/errno.h>
+#	include <sys/systm.h>
+#	include <sys/kernel.h>
+#	include <sys/malloc.h>
+#	include <sys/lock.h>
+#	include <sys/mutex.h>
 
-MALLOC_DEFINE(M_HASH_BUCKET, "hash_bucket", "hash bucket");
-#define HB_ALLOC(size)		malloc(size, M_HASH_BUCKET, (M_NOWAIT | M_ZERO))
-#define HB_FREE(mem)		free(mem, M_HASH_BUCKET)
+	MALLOC_DEFINE(M_HASH_BUCKET, "hash_bucket", "hash bucket");
+#	define HB_ALLOC(size)		malloc(size, M_HASH_BUCKET, (M_NOWAIT | M_ZERO))
+#	define HB_FREE(mem)		free(mem, M_HASH_BUCKET)
 
-#define HB_MTX_S		struct mtx
-#define HB_MTX_INIT(mutex)	mtx_init(mutex, NULL, NULL, HB_MTX_RECURSE)
-#define HB_MTX_DESTROY(mutex)	mtx_destroy(mutex)
-#define HB_MTX_LOCK(mutex)	mtx_lock(mutex)
-#define HB_MTX_TRYLOCK(mutex)	mtx_trylock(mutex)
-#define HB_MTX_UNLOCK(mutex)	mtx_unlock(mutex)
-
+#	define HB_MTX_S			struct mtx
+#	define HB_MTX_INIT(mutex)	mtx_init(mutex, NULL, NULL, HB_MTX_RECURSE)
+#	define HB_MTX_DESTROY(mutex)	mtx_destroy(mutex)
+#	define HB_MTX_LOCK(mutex)	mtx_lock(mutex)
+#	define HB_MTX_TRYLOCK(mutex)	mtx_trylock(mutex)
+#	define HB_MTX_UNLOCK(mutex)	mtx_unlock(mutex)
 #else /* User space */
-#include <pthread.h>
-#include <errno.h>
-#include <string.h> /* bcopy, bzero, memcpy, memmove, memset, strerror... */
-#include <stdlib.h> /* malloc, exit */
+#	include <pthread.h>
+#	include <errno.h>
+#	include <string.h> /* bcopy, bzero, memcpy, memmove, memset, strerror... */
+#	include <stdlib.h> /* malloc, exit */
 
-#define HB_ALLOC(size)		malloc(size)
-#define HB_FREE(mem)		free(mem)
+#	define HB_ALLOC(size)		malloc(size)
+#	define HB_FREE(mem)		free(mem)
 
-#define HB_MTX_S		pthread_mutex_t
+#	define HB_MTX_S			pthread_mutex_t
 
-#define HB_MTX_INIT(mutex) {						\
-	pthread_mutexattr_t attr;					\
-	pthread_mutexattr_init(&attr);					\
-	pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);	\
-	pthread_mutex_init(mutex, &attr);				\
-	pthread_mutexattr_destroy(&attr);				\
-}
-#define HB_MTX_DESTROY(mutex)	pthread_mutex_destroy(mutex)
-#define HB_MTX_LOCK(mutex)	pthread_mutex_lock(mutex)
-#define HB_MTX_TRYLOCK(mutex)	pthread_mutex_trylock(mutex)
-#define HB_MTX_UNLOCK(mutex)	pthread_mutex_unlock(mutex)
-
+#	define HB_MTX_INIT(mutex) {					\
+		pthread_mutexattr_t attr;				\
+		pthread_mutexattr_init(&attr);				\
+		pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE); \
+		pthread_mutex_init(mutex, &attr);			\
+		pthread_mutexattr_destroy(&attr);			\
+	}
+#	define HB_MTX_DESTROY(mutex)	pthread_mutex_destroy(mutex)
+#	define HB_MTX_LOCK(mutex)	pthread_mutex_lock(mutex)
+#	define HB_MTX_TRYLOCK(mutex)	pthread_mutex_trylock(mutex)
+#	define HB_MTX_UNLOCK(mutex)	pthread_mutex_unlock(mutex)
 #endif
 
 
@@ -136,7 +134,7 @@ typedef int (*hbucket_entry_cmp_fn)(void *udata, const uint8_t *key,
  */
 typedef int (*hbucket_entry_enum_cb)(void *udata, hbucket_entry_p entry);
 
-/* Contain hbucket_zone_t~s and additional data.  */
+/* Contain hbucket_zone_t~s and additional data. */
 typedef struct hbucket_s {
 	hbucket_zone_p	zones;
 	volatile size_t	count; /* Total entries count in bucket. */
@@ -158,14 +156,14 @@ typedef struct hbucket_s {
  * - add to locked zone and unlock it.
  */
 // hbucket_entry_get()
-#define HBUCKET_GET_F_NO_LOCK	(1 << 0) /* Do not lock bucket before get. */
-#define HBUCKET_GET_F_S_UNLOCK	(1 << 1) /* Unlock bucket if found, be careful! */
-#define HBUCKET_GET_F_F_LOCK	(1 << 2) /* Do not unlock bucket if not found. */
+#define HBUCKET_GET_F_NO_LOCK	(((uint32_t)1) << 0) /* Do not lock bucket before get. */
+#define HBUCKET_GET_F_S_UNLOCK	(((uint32_t)1) << 1) /* Unlock bucket if found, be careful! */
+#define HBUCKET_GET_F_F_LOCK	(((uint32_t)1) << 2) /* Do not unlock bucket if not found. */
 
 /* If zone != NULL then key and key_size ignored. */
 // hbucket_entry_add()
-#define HBUCKET_ADD_F_NO_LOCK	(1 << 0) /* Do not lock bucket before add. */
-#define HBUCKET_ADD_F_NO_UNLOCK	(1 << 1) /* Do not unlock bucket after add. */
+#define HBUCKET_ADD_F_NO_LOCK	(((uint32_t)1) << 0) /* Do not lock bucket before add. */
+#define HBUCKET_ADD_F_NO_UNLOCK	(((uint32_t)1) << 1) /* Do not unlock bucket after add. */
 
 
 
@@ -321,8 +319,9 @@ hbucket_entry_enum(hbucket_p hbskt, hbucket_entry_enum_cb enum_cb, void *udata) 
 	if (NULL == hbskt || NULL == enum_cb)
 		return (EINVAL);
 
-	for (i = 0; i < hbskt->hashsize && 0 == ret; i ++)
+	for (i = 0; i < hbskt->hashsize && 0 == ret; i ++) {
 		ret = hbucket_zone_entry_enum(&hbskt->zones[i], enum_cb, udata);
+	}
 
 	return (ret);
 }

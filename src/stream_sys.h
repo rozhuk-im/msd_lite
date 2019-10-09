@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012 - 2014 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2012 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,7 +35,7 @@
 #include <sys/queue.h>
 #include <time.h>
 
-#include "core_macro.h"
+#include "macro_helpers.h"
 #include "core_thrp.h"
 #include "core_io_buf.h"
 #include "core_io_task.h"
@@ -50,7 +50,7 @@ typedef struct str_src_s	*str_src_p;
 
 typedef struct str_hub_cli_s {
 	TAILQ_ENTRY(str_hub_cli_s) next; /* For list. */
-	uintptr_t	skt;		/* socket  */
+	uintptr_t	skt;		/* socket */
 	r_buf_rpos_t	rpos;		/* Ring buf read pos. */
 	time_t		conn_time;	/* Connection start time. */
 	size_t		offset;		/* For HTTP headers. */
@@ -61,11 +61,11 @@ typedef struct str_hub_cli_s {
 	struct sockaddr_storage remonte_addr; /* Client address. */
 	struct sockaddr_storage	xreal_addr;
 } str_hub_cli_t, *str_hub_cli_p;
-
 TAILQ_HEAD(str_hub_cli_head, str_hub_cli_s);
+
 /* Flags. */
-#define STR_HUB_CLI_F_RPOS_INITIALIZED	(1 << 0)
-#define STR_HUB_CLI_F_HTTP_HDRS_SENDED	(1 << 8)
+#define STR_HUB_CLI_STATE_F_RPOS_INITIALIZED	(((uint32_t)1) << 0)
+#define STR_HUB_CLI_STATE_F_HTTP_HDRS_SENDED	(((uint32_t)1) << 8)
 /* Limit for User-Agent len. */
 #define STR_HUB_CLI_USER_AGENT_MAX_SIZE	256
 
@@ -78,7 +78,7 @@ TAILQ_HEAD(str_hub_cli_head, str_hub_cli_s);
 
 
 
-typedef struct str_hub_params_s {
+typedef struct str_hub_settings_s {
 	uint32_t	flags;
 	uint32_t	skt_snd_buf;	/* For receiver clients. */
 	/* Client settings and defaults. */
@@ -86,22 +86,22 @@ typedef struct str_hub_params_s {
 	char		cc_name[TCP_CA_NAME_MAX];/* tcp congestion control forced for client. */
 	/* End Client settings and defaults. */
 	size_t		ring_buf_size;	/* Size of ring buf. */
-	uint32_t	precache;
-	uint32_t	snd_block_min_size;
+	size_t		precache;
+	size_t		snd_block_min_size;
 	uint8_t		*cust_http_hdrs;
 	size_t		cust_http_hdrs_size;
-} str_hub_params_t, *str_hub_params_p;
+} str_hub_settings_t, *str_hub_settings_p;
 /* Flags. */
-#define STR_HUB_P_F_DROP_SLOW_CLI		(1 << 5) /* Disconnect lagged clients. */
-#define STR_HUB_P_F_SKT_HALFCLOSED		(1 << 10) /* Enable shutdown(SHUT_RD) for clients. */
-#define STR_HUB_P_F_SKT_TCP_NODELAY		(1 << 11) /* Enable TCP_NODELAY for clients. */
-#define STR_HUB_P_F_SKT_TCP_NOPUSH		(1 << 12) /* Enable TCP_NOPUSH for clients. */
+#define STR_HUB_S_F_DROP_SLOW_CLI		(((uint32_t)1) <<  5) /* Disconnect lagged clients. */
+#define STR_HUB_S_F_SKT_HALFCLOSED		(((uint32_t)1) << 10) /* Enable shutdown(SHUT_RD) for clients. */
+#define STR_HUB_S_F_SKT_TCP_NODELAY		(((uint32_t)1) << 11) /* Enable TCP_NODELAY for clients. */
+#define STR_HUB_S_F_SKT_TCP_NOPUSH		(((uint32_t)1) << 12) /* Enable TCP_NOPUSH for clients. */
 /* Default values. */
-#define STR_HUB_P_DEF_FLAGS		(0)
-#define STR_HUB_P_DEF_RING_BUF_SIZE	(1 * 1024) /* kb */
-#define STR_HUB_P_DEF_PRECAHE		(1 * 1024) /* kb */
-#define STR_HUB_P_DEF_SND_BLOCK_MIN_SIZE (64) /* kb */
-#define STR_HUB_P_DEF_SKT_SND_BUF	(256)	/* kb */
+#define STR_HUB_S_DEF_FLAGS		(0)
+#define STR_HUB_S_DEF_RING_BUF_SIZE	(1 * 1024) /* kb */
+#define STR_HUB_S_DEF_PRECAHE		(1 * 1024) /* kb */
+#define STR_HUB_S_DEF_SND_BLOCK_MIN_SIZE (64) /* kb */
+#define STR_HUB_S_DEF_SKT_SND_BUF	(256)	/* kb */
 
 
 /* Connection info */
@@ -115,22 +115,22 @@ typedef struct str_src_conn_mc_s {
 	str_src_conn_udp_t udp;
 	uint32_t	if_index;
 } str_src_conn_mc_t, *str_src_conn_mc_p;
-#define STR_SRC_CONN_DEF_IFINDEX	(-1)
+#define STR_SRC_CONN_DEF_IFINDEX	((uint32_t)-1)
 
 typedef union str_src_conn_params_s {
 	str_src_conn_udp_t	udp;
 	str_src_conn_mc_t	mc;
 } str_src_conn_params_t, *str_src_conn_params_p;
 
-typedef struct str_src_params_s {
+typedef struct str_src_settings_s {
 	uint32_t	skt_rcv_buf;	/* For receiver. */
 	uint32_t	skt_rcv_lowat;	/* For receiver. */
-	uintptr_t	rcv_timeout;	/* No multicast time to self destroy. */
-} str_src_params_t, *str_src_params_p;
+	uint64_t	rcv_timeout;	/* No multicast time to self destroy. */
+} str_src_settings_t, *str_src_settings_p;
 /* Default values. */
-#define STR_SRC_P_DEF_SKT_RCV_BUF	(512)	/* kb */
-#define STR_SRC_P_DEF_SKT_RCV_LOWAT	(48)	/* kb */
-#define STR_SRC_P_DEF_UDP_RCV_TIMEOUT	(2)	/* s */
+#define STR_SRC_S_DEF_SKT_RCV_BUF	(512)	/* kb */
+#define STR_SRC_S_DEF_SKT_RCV_LOWAT	(48)	/* kb */
+#define STR_SRC_S_DEF_UDP_RCV_TIMEOUT	(2)	/* s */
 
 
 /*
@@ -144,18 +144,18 @@ typedef struct str_hub_s {
 	uint8_t		*name;		/* Stream hub unique name. */
 	size_t		name_size;	/* Name size. */
 	struct str_hub_cli_head cli_head; /* List with clients. */
-	volatile size_t	cli_count;	/* Count clients. */
+	size_t		cli_count;	/* Count clients. */
 	/* For stat */
 	/* Baud rate calculation. */
-	struct timespec		tp_last_recv;	/* For baud rate calculation and status. */
-	volatile uint64_t	received_count;	/* Accumulator for baud rate calculation. */
-	volatile uint64_t	sended_count;	/* Accumulator for baud rate calculation. */
-	volatile uint64_t	baud_rate_in;	/* Total rate in (megabit per sec). */
-	volatile uint64_t	baud_rate_out;	/* Total rate out (megabit per sec). */
-	volatile uint64_t	dropped_count;	/* Dropped clients count. */
+	struct timespec tp_last_recv;	/* For baud rate calculation and status. */
+	uint64_t	received_count;	/* Accumulator for baud rate calculation. */
+	uint64_t	sended_count;	/* Accumulator for baud rate calculation. */
+	uint64_t	baud_rate_in;	/* Total rate in (megabit per sec). */
+	uint64_t	baud_rate_out;	/* Total rate out (megabit per sec). */
+	uint64_t	dropped_count;	/* Dropped clients count. */
 	/* -- stat */
 	io_task_p	iotask;		/* Data/Packets receiver. */
-	uintptr_t	r_buf_fd;	/* r_buf shared memory file descriptor, then STR_SRC_P_F_ENABLE_RING_BUF_IN_FILE set */
+	uintptr_t	r_buf_fd;	/* r_buf shared memory file descriptor */
 	r_buf_p		r_buf;		/* Ring buf, write pos. */
 #ifdef __linux__ /* Linux specific code. */
 	size_t		r_buf_rcvd;	/* Ring buf LOWAT emulator. */
@@ -169,10 +169,10 @@ TAILQ_HEAD(str_hub_head, str_hub_s);
 
 /* Per thread and summary stats. */
 typedef struct str_hubs_stat_s {
-	volatile size_t		str_hub_count;	/* Stream hubs count. */
-	volatile size_t		cli_count;	/* Total clients count. */
-	volatile uint64_t	baud_rate_in;	/* Total rate in (megabit per sec). */
-	volatile uint64_t	baud_rate_out;	/* Total rate out (megabit per sec). */
+	size_t		str_hub_count;	/* Stream hubs count. */
+	size_t		cli_count;	/* Total clients count. */
+	uint64_t	baud_rate_in;	/* Total rate in (megabit per sec). */
+	uint64_t	baud_rate_out;	/* Total rate out (megabit per sec). */
 } str_hubs_stat_t, *str_hubs_stat_p;
 
 /* Per thread data */
@@ -190,18 +190,18 @@ typedef struct str_hubs_bckt_s {
 	str_hub_thrd_p	thr_data;	/* Per thread hubs + stat. */
 	size_t		base_http_hdrs_size;
 	uint8_t		base_http_hdrs[512];
-	str_hub_params_t hub_params;	/* Settings. */
-	str_src_params_t src_params;	/* Settings. */
+	str_hub_settings_t hub_params;	/* Settings. */
+	str_src_settings_t src_params;	/* Settings. */
 } str_hubs_bckt_t;
 
 
-void	str_hub_params_def(str_hub_params_p p_ret);
-void	str_src_params_def(str_src_params_p p_ret);
+void	str_hub_settings_def(str_hub_settings_p p_ret);
+void	str_src_settings_def(str_src_settings_p p_ret);
 void	str_src_conn_def(str_src_conn_params_p src_conn_params);
 
 
 int	str_hubs_bckt_create(thrp_p thrp, const char *app_ver,
-	    str_hub_params_p hub_params, str_src_params_p src_params,
+	    str_hub_settings_p hub_params, str_src_settings_p src_params,
 	    str_hubs_bckt_p *shbskt_ret);
 void	str_hubs_bckt_destroy(str_hubs_bckt_p shbskt);
 

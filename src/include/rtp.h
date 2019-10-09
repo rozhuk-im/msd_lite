@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012 - 2013 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2012 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -44,10 +44,10 @@
 /*
  * Current protocol version.
  */
-#define RTP_VERSION    2
+#define RTP_VERSION	2
 
-#define RTP_SEQ_MOD (1<<16)
-#define RTP_MAX_SDES 255 /* maximum text length for SDES */
+#define RTP_SEQ_MOD	(1<<16)
+#define RTP_MAX_SDES	255 /* maximum text length for SDES */
 
 typedef enum {
 	RTCP_SR		= 200,
@@ -127,7 +127,7 @@ typedef struct {
 /*
  * Big-endian mask for version, padding bit and packet type pair
  */
-#define RTCP_VALID_MASK (0xc000 | 0x2000 | 0xfe)
+#define RTCP_VALID_MASK	(0xc000 | 0x2000 | 0xfe)
 #define RTCP_VALID_VALUE ((RTP_VERSION << 14) | RTCP_SR)
 
 /*
@@ -209,8 +209,8 @@ typedef struct {
 static inline int
 rtp_payload_get(const uint8_t *buf, const size_t buf_size,
     size_t *start_off, size_t *end_off) {
-	rtp_hdr_p rtp_hdr = (rtp_hdr_p)buf;
-	rtp_hdr_ext_p rtp_hdr_ext;
+	const struct rtp_hdr_s *rtp_hdr = (const struct rtp_hdr_s *)buf;
+	const struct rtp_hdr_ext_s *rtp_hdr_ext;
 	size_t s_off, e_off = 0;
 
 	if (sizeof(rtp_hdr_t) > buf_size)
@@ -220,14 +220,15 @@ rtp_payload_get(const uint8_t *buf, const size_t buf_size,
 	s_off = (sizeof(rtp_hdr_t) + (sizeof(uint32_t) * rtp_hdr->cc));
 
 	if (rtp_hdr->x) { /* Extension. */
-		rtp_hdr_ext = (rtp_hdr_ext_p)(buf + s_off);
+		rtp_hdr_ext = (const struct rtp_hdr_ext_s *)(buf + s_off);
 		s_off += sizeof(rtp_hdr_ext_t);
 		if (s_off > buf_size)
 			return (EINVAL);
 		s_off += (sizeof(uint32_t) * ntohs(rtp_hdr_ext->length)); // XXX: ntohs() ???
 	}
-	if (rtp_hdr->p) /* Pad after data. */
+	if (rtp_hdr->p) { /* Pad after data. */
 		e_off = buf[(buf_size - 1)];
+	}
 	if ((s_off + e_off) > buf_size)
 		return (EINVAL);
 
@@ -280,8 +281,9 @@ rtp_src_info_seq_update(rtp_src_info_p info, uint16_t seq) {
 		return (0);
 	} else if (udelta < MAX_DROPOUT) {
 		/* in order, with permissible gap */
-		if (seq < info->max_seq) /* Sequence number wrapped - count another 64K cycle. */
+		if (seq < info->max_seq) { /* Sequence number wrapped - count another 64K cycle. */
 			info->cycles += RTP_SEQ_MOD;
+		}
 		info->max_seq = seq;
 	} else if (udelta <= (RTP_SEQ_MOD - MAX_MISORDER)) {
 		/* the sequence number made a very large jump */

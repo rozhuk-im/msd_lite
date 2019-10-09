@@ -27,13 +27,8 @@
 
 
 
-#if !defined(AFX_NUMTOSTR__H__INCLUDED)
-#define AFX_NUMTOSTR__H__INCLUDED
-
-
-#if _MSC_VER > 1000
-#pragma once
-#endif // _MSC_VER > 1000
+#ifndef __NUMTOSTR_H__
+#define __NUMTOSTR_H__
 
 
 #ifdef _WINDOWS
@@ -46,7 +41,7 @@
 	#define	size_t		SIZE_T
 	#define	ssize_t		SSIZE_T
 #else
-#include <inttypes.h>
+#	include <inttypes.h>
 #endif
 
 static const size_t Num2Len[] = {
@@ -69,94 +64,92 @@ static const size_t Num2Len[] = {
 
 static inline size_t
 UNumToStr(size_t dwNum, LPSTR pString, size_t dwStringLen) {
-	size_t dwRet=0;
-	size_t dwNumtm=1;
+	size_t dwRet = 0;
+	size_t dwNumtm = 1;
 
 	do
 	{
-		pString++;// перемещаем указатель на следующую позицию
-		dwStringLen--;// уменьшаем длинну
-		dwNumtm*=10;
-	}while(dwNum>dwNumtm && dwStringLen);
-	(*pString--)=0;
+		pString ++;// перемещаем указатель на следующую позицию
+		dwStringLen --;// уменьшаем длинну
+		dwNumtm *= 10;
+	} while (dwNum > dwNumtm && dwStringLen);
+	(*pString --) = 0;
 
 
 	if (dwStringLen)
 	{
 		do
 		{
-			dwNumtm=dwNum;
-			dwNum/=10;
+			dwNumtm = dwNum;
+			dwNum /= 10;
 
-			(*pString)=(unsigned char)(48+(dwNumtm-(dwNum*10)));
-			pString--;// перемещаем указатель на следующую позицию
-		}while(dwNum);
+			(*pString) = (unsigned char)(48 + (dwNumtm - (dwNum * 10)));
+			pString --;// перемещаем указатель на следующую позицию
+		} while (dwNum);
 	}
 
-return (dwRet);
+	return (dwRet);
 }
 
 
-static inline DWORD
-UNumToStr32(DWORD dwNum,LPSTR pString,size_t dwStringLen) {
-	DWORD dwRet=0;
-	DWORD dwNumtm=1;
+static inline uint32_t
+UNumToStr32(uint32_t dwNum, LPSTR pString, size_t dwStringLen) {
+	uint32_t dwRet = 0;
+	uint32_t dwNumtm = 1;
 
 	do
 	{
-		pString++;// перемещаем указатель на следующую позицию
-		dwStringLen--;// уменьшаем длинну
-		dwNumtm*=10;
-	}while(dwNum>dwNumtm && dwStringLen);
-	(*pString--)=0;
+		pString ++;// перемещаем указатель на следующую позицию
+		dwStringLen --;// уменьшаем длинну
+		dwNumtm *= 10;
+	} while (dwNum > dwNumtm && dwStringLen);
+	(*pString --) = 0;
 
 
 	if (dwStringLen)
 	{
 		do
 		{
-			dwNumtm=dwNum;
-			dwNum/=10;
+			dwNumtm = dwNum;
+			dwNum /= 10;
 
-			(*pString)=(unsigned char)(48+(dwNumtm-(dwNum*10)));
-			pString--;// перемещаем указатель на следующую позицию
-		}while(dwNum);
+			(*pString) = (unsigned char)(48 + (dwNumtm - (dwNum * 10)));
+			pString --;// перемещаем указатель на следующую позицию
+		} while (dwNum);
 	}	
 
-return (dwRet);
+	return (dwRet);
 }
 
 
 static inline DWORD
-UNumToStr64(DWORDLONG dwNum,LPSTR pString,size_t dwStringLen) {
-	DWORD dwRet=0;
-	DWORDLONG dwNumtm=1;
+UNumToStr64(uint64_t dwNum, LPSTR pString, size_t dwStringLen) {
+	DWORD dwRet = 0;
+	uint64_t dwNumtm = 1;
 
 	do
 	{
-		pString++;// перемещаем указатель на следующую позицию
-		dwStringLen--;// уменьшаем длинну
-		dwNumtm*=10;
-	}while(dwNum>dwNumtm && dwStringLen);
-	(*pString--)=0;
+		pString ++;// перемещаем указатель на следующую позицию
+		dwStringLen --;// уменьшаем длинну
+		dwNumtm *= 10;
+	} while (dwNum > dwNumtm && dwStringLen);
+	(*pString --) = 0;
 
 
 	if (dwStringLen)
 	{
 		do
 		{
-			dwNumtm=dwNum;
-			dwNum/=10;
+			dwNumtm = dwNum;
+			dwNum /= 10;
 
-			(*pString)=(unsigned char)(48+(dwNumtm-(dwNum*10)));
-			pString--;// перемещаем указатель на следующую позицию
-		}while(dwNum);
+			(*pString) = (unsigned char)(48 + (dwNumtm - (dwNum * 10)));
+			pString --;// перемещаем указатель на следующую позицию
+		} while (dwNum);
 	}
 
-return (dwRet);
+	return (dwRet);
 }
 
 
-
-
-#endif // !defined(AFX_NUMTOSTR__H__INCLUDED)
+#endif // __NUMTOSTR_H__

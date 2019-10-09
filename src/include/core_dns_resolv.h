@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2011 - 2014 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2011 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,8 +39,8 @@
 typedef struct dns_rslvr_s	*dns_rslvr_p; /* thread pool */
 typedef struct dns_rslvr_task_s	*dns_rslvr_task_p; /* thread pool */
 
-#define DNS_R_F_IPV4	(1 << 0) /* IPv4 */
-#define DNS_R_F_IPV6	(1 << 1) /* IPv6 */
+#define DNS_R_F_IPV4	(((uint16_t)1) << 0) /* IPv4 */
+#define DNS_R_F_IPV6	(((uint16_t)1) << 1) /* IPv6 */
 #define DNS_R_F_IP_ALL	(DNS_R_F_IPV4 | DNS_R_F_IPV6)
 
 

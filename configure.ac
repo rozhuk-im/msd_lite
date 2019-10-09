@@ -19,6 +19,22 @@ AC_LANG_C
 AC_CHECK_LIB(pthread, pthread_create,,AC_MSG_ERROR(requires pthread))
 AC_CHECK_FUNCS([clock_gettime],,
                [AC_CHECK_LIB(rt, clock_gettime,,AC_MSG_ERROR(requires rt))])
+AC_CHECK_FUNCS([shm_open],,
+               [AC_CHECK_LIB(rt, shm_open,,AC_MSG_ERROR(requires rt))])
+
+
+AC_ARG_ENABLE(debug,
+AS_HELP_STRING([--enable-debug],
+               [enable debugging, default: no]),
+[case "${enableval}" in
+             yes) debug=true ;;
+             no)  debug=false ;;
+             *)   AC_MSG_ERROR([bad value ${enableval} for --enable-debug]) ;;
+esac],
+[debug=false])
+
+AM_CONDITIONAL(DEBUG, test x"$debug" = x"true")
+
 
 
 AC_OUTPUT([Makefile] [src/Makefile])

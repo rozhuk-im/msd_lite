@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012 - 2013 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2012 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,11 +40,11 @@
 #include <sys/types.h>
 #include <sys/socket.h> // AF_INET, AF_INET6
 #include <inttypes.h>
-#include "mem_find.h"
+#include "mem_helpers.h"
 
 
 
-#define SAP_PORT 9875 /* SAP is always on that port */
+#define SAP_PORT		9875 /* SAP is always on that port */
 #define SAP_V4_LINK_ADDRESS	"224.0.0.255"	/* Link-local SAP address */
 #define SAP_V4_LOCAL_ADDRESS	"239.255.255.255" /* Local (smallest non-link-local scope) SAP address */
 #define SAP_V4_ORG_ADDRESS	"239.195.255.255" /* Organization-local SAP address */
@@ -143,7 +143,7 @@ sap_packet_get_payload(uint8_t *pkt, size_t pkt_size) {
 	    ((sap_hdr_p)pkt)->auth_len);
 	//if (0 == memcmp("application/sdp", ret, 16))
 	//	ret += 16; /* Text, including null char. */
-	tm = mem_find_byte((ret - pkt), pkt, pkt_size, 0);
+	tm = mem_chr_ptr(ret, pkt, pkt_size, 0);
 	if (NULL != tm) /* Optional payload end. */
 		ret = (tm + 1);
 
