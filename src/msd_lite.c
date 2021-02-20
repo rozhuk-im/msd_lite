@@ -190,8 +190,7 @@ msd_http_cust_hdrs_load(uint8_t *buf, size_t buf_size,
 		return (ESPIPE);
 	}
 
-	hdrs_size -= 2; /* Remove last crlf. */
-	(*hdrs) = zalloc((hdrs_size + 8));
+	(*hdrs) = malloc((hdrs_size + 8));
 	if (NULL == (*hdrs))
 		return (ENOMEM);
 	/* Second pass: copy headers to buffer. */
@@ -602,8 +601,8 @@ send_http_to_cli(http_srv_cli_p cli, uint32_t status_code) {
 		http_srv_cli_del_resp_p_flags(cli, HTTP_SRV_RESP_P_F_CONTENT_SIZE);
 
 		if (6 < params->cust_http_hdrs_size) {
-			iov[0].iov_base = (void*)(params->cust_http_hdrs + 2);
-			iov[0].iov_len = (params->cust_http_hdrs_size - 6);
+			iov[0].iov_base = (void*)params->cust_http_hdrs;
+			iov[0].iov_len = params->cust_http_hdrs_size;
 		} else {
 			iov[0].iov_base = NULL;
 			iov[0].iov_len = 0;
@@ -655,7 +654,6 @@ msd_http_srv_hub_attach(http_srv_cli_p cli, uint8_t *hub_name, size_t hub_name_s
 	strh_cli = str_hub_cli_alloc(skt, (const char*)ptm, tm);
 	if (NULL == strh_cli) {
 		LOG_ERR(ENOMEM, "str_hub_cli_alloc()");
-		http_srv_cli_free(cli);
 		return (ENOMEM);
 	}
 	/*
@@ -677,10 +675,12 @@ msd_http_srv_hub_attach(http_srv_cli_p cli, uint8_t *hub_name, size_t hub_name_s
 	    src_conn_params);
 	/* Do not read/write to stream hub client, stream hub is new owner! */
 	if (0 != error) {
+		strh_cli->skt = -1;
 		str_hub_cli_destroy(NULL, strh_cli);
+		LOG_ERR(error, "str_hub_cli_attach()");
+	} else {
 		io_task_flags_del(iotask, IO_TASK_F_CLOSE_ON_DESTROY);
 		http_srv_cli_free(cli);
-		LOG_ERR(error, "str_hub_cli_attach()");
 	}
 	return (error);
 }
