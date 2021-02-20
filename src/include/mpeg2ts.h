@@ -37,6 +37,10 @@
 #include <inttypes.h>
 #include "mem_find.h"
 
+#ifndef min
+#define min(a,b)	(((a) < (b)) ? (a) : (b))
+#endif
+
 
 
 #define MPEG2_TS_PKT_SIZE	188 /* MPEG-2 TS packet size */
