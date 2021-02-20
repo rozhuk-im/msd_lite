@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2012 - 2021 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,12 +29,6 @@
 
 
 #include <sys/param.h>
-
-#ifdef __linux__ /* Linux specific code. */
-#	define _GNU_SOURCE /* See feature_test_macros(7) */
-#	define __USE_GNU 1
-#endif /* Linux specific code. */
-
 #include <sys/types.h>
 #include <sys/mman.h> /* for demo mode */
 //#include <sys/stat.h> /* For mode constants */
@@ -58,35 +52,29 @@
 #include <signal.h> /* SIGNAL constants. */
 
 
-#include "mem_helpers.h"
-#include "StrToNum.h"
-#include "HTTP.h"
-#include "xml.h"
+#include "utils/mem_utils.h"
+#include "utils/str2num.h"
+#include "proto/http.h"
+#include "utils/xml.h"
 
-#include "macro_helpers.h"
-#include "core_io_buf.h"
-#include "core_io_net.h"
-#include "core_io_task.h"
-#include "core_helpers.h"
-#include "core_net_helpers.h"
-#include "core_log.h"
-#include "core_http_srv.h"
-#include "core_info.h"
+#include "utils/macro.h"
+#include "utils/io_buf.h"
+#include "net/socket.h"
+#include "net/socket_address.h"
+#include "net/utils.h"
+#include "threadpool/threadpool_task.h"
+#include "utils/buf_str.h"
+#include "utils/sys.h"
+#include "utils/log.h"
+#include "proto/http_server.h"
+#include "utils/info.h"
+#include "utils/cmd_line_daemon.h"
+#include "utils/sys_res_limits_xml.h"
 #include "msd_lite_stat_text.h"
 
 
 
-#ifdef BSD /* BSD specific code. */
-#include <malloc_np.h>
-#ifdef DEBUG
-const char *malloc_conf = "abort:true,stats_print:true,zero:false,junk:true,redzone:true,quarantine:1024,xmalloc:true,tcache:true,prof_leak:true"; /* FreeBSD 10+ */
-#else
-const char *malloc_conf = "tcache.enabled:true,zero:false"; /* FreeBSD 10+ */
-#endif
-#endif /* BSD specific code. */
-
-
-#include <config.h>
+#include "config.h"
 #undef PACKAGE_NAME
 #define PACKAGE_NAME		"Multi stream daemon lite"
 #define CFG_FILE_MAX_SIZE	(128 * 1024)
@@ -94,7 +82,6 @@ const char *malloc_conf = "tcache.enabled:true,zero:false"; /* FreeBSD 10+ */
 
 
 struct prog_settings {
-	thrp_p		thrp;
 	http_srv_p	http_srv;	/* HTTP server. */
 	str_hubs_bckt_p shbskt;		/* Stream hubs. */
 
@@ -102,7 +89,7 @@ struct prog_settings {
 	uint8_t		syslimits[1024]; /* System limits */
 	size_t		sysinfo_size;	/* System info size */
 	size_t		syslimits_size;	/* System limits size */
-	core_info_sysres_t sysres;	/* System resources statistic data. */
+	info_sysres_t sysres;	/* System resources statistic data. */
 
 
 	str_hub_settings_t	hub_params; /* Stream hub params. */
@@ -110,7 +97,6 @@ struct prog_settings {
 	str_src_conn_params_t	src_conn_params; /* Stream hub source connection params. */
 
 	uintptr_t	log_fd;		// log file descriptor
-	cmd_line_data_t	cmd_line_data;	/*  */
 };
 static struct prog_settings g_data;
 
@@ -252,11 +238,12 @@ msd_src_profile_load(const uint8_t *data, size_t data_size, str_src_settings_p p
 		return (EINVAL);
 
 	/* Read from config. */
+	/* TODO: use socket_options.c */
 	xml_get_val_uint32_args(data, data_size, NULL, &params->skt_rcv_buf,
 	    (const uint8_t*)"skt", "rcvBuf", NULL);
 	xml_get_val_uint32_args(data, data_size, NULL, &params->skt_rcv_lowat,
 	    (const uint8_t*)"skt", "rcvLoWatermark", NULL);
-	xml_get_val_size_t_args(data, data_size, NULL, &params->rcv_timeout,
+	xml_get_val_uint64_args(data, data_size, NULL, &params->rcv_timeout,
 	    (const uint8_t*)"skt", "rcvTimeout", NULL);
 
 	return (0);
@@ -279,8 +266,8 @@ msd_src_conn_profile_load(const uint8_t *data, size_t data_size, void *conn) {
 	}
 	if (0 == xml_get_val_args(data, data_size, NULL, NULL, NULL,
 	    &ptm, &tm, (const uint8_t*)"multicast", "ifName", NULL)) {
-		memcpy(if_name, ptm, min(IFNAMSIZ, tm));
-		if_name[min(IFNAMSIZ, tm)] = 0;
+		memcpy(if_name, ptm, MIN(IFNAMSIZ, tm));
+		if_name[MIN(IFNAMSIZ, tm)] = 0;
 		((str_src_conn_mc_p)conn)->if_index = if_nametoindex(if_name);
 	}
 
@@ -292,71 +279,69 @@ msd_src_conn_profile_load(const uint8_t *data, size_t data_size, void *conn) {
 int
 main(int argc, char *argv[]) {
 	int error = 0;
+	int log_fd = -1;
 	uint8_t *cfg_file_buf = NULL;
 	size_t tm, cfg_file_buf_size = 0;
+	tp_p tp;
+	cmd_line_data_t cmd_line_data;
 
 
 	mem_bzero(&g_data, sizeof(g_data));
-	g_data.log_fd = (uintptr_t)-1;
-	if (0 != cmd_line_parse(argc, argv, &g_data.cmd_line_data)) {
-		cmd_line_usage(PACKAGE_NAME, PACKAGE_VERSION);
+	if (0 != cmd_line_parse(argc, argv, &cmd_line_data)) {
+		cmd_line_usage(PACKAGE_DESCRIPTION, PACKAGE_VERSION,
+		    "Rozhuk Ivan <rozhuk.im@gmail.com>",
+		    PACKAGE_URL);
 		return (0);
+	}
+	if (0 != cmd_line_data.daemon) {
+		make_daemon();
 	}
 
     { // process config file
 	const uint8_t *data;
 	char strbuf[1024];
 	size_t data_size;
-	thrp_settings_t thrp_s;
+	tp_settings_t tp_s;
 	http_srv_cli_ccb_t ccb;
 	http_srv_settings_t http_s;
 
-
-	error = read_file(g_data.cmd_line_data.cfg_file_name, 0, CFG_FILE_MAX_SIZE,
-	    &cfg_file_buf, &cfg_file_buf_size);
+	g_log_fd = (uintptr_t)open("/dev/stderr", (O_WRONLY | O_APPEND));
+	error = read_file(cmd_line_data.cfg_file_name, 0, 0, 0,
+	    CFG_FILE_MAX_SIZE, &cfg_file_buf, &cfg_file_buf_size);
 	if (0 != error) {
-		core_log_fd = (uintptr_t)open("/dev/stdout", (O_WRONLY | O_APPEND));
 		LOG_ERR(error, "config read_file()");
 		goto err_out;
 	}
 	if (0 != xml_get_val_args(cfg_file_buf, cfg_file_buf_size,
 	    NULL, NULL, NULL, NULL, NULL,
 	    (const uint8_t*)"msd", NULL)) {
-		core_log_fd = (uintptr_t)open("/dev/stdout", (O_WRONLY | O_APPEND));
 		LOG_INFO("Config file XML format invalid.");
 		goto err_out;
 	}
 
 	/* Log file */
-	if (0 == g_data.cmd_line_data.verbose &&
+	if (0 == cmd_line_data.verbose &&
 	    0 == MSD_CFG_GET_VAL_DATA(NULL, &data, &data_size,
 	    "log", "file", NULL)) {
 		if (sizeof(strbuf) > data_size) {
 			memcpy(strbuf, data, data_size);
 			strbuf[data_size] = 0;
-			uintptr_t fd = (uintptr_t)open(strbuf, (O_WRONLY | O_APPEND | O_CREAT), 0644);
-			if ((uintptr_t)-1 != fd) {
-				g_data.log_fd = fd;
-				core_log_fd = g_data.log_fd;
-			} else {
-				core_log_fd = (uintptr_t)open("/dev/stderr", (O_WRONLY | O_APPEND));
+			log_fd = open(strbuf,
+			    (O_WRONLY | O_APPEND | O_CREAT), 0644);
+			if (-1 == log_fd) {
 				LOG_ERR(errno, "Fail to open log file.");
-				close((int)core_log_fd);
-				core_log_fd = (uintptr_t)-1;
 			}
 		} else {
-			core_log_fd = (uintptr_t)open("/dev/stderr", (O_WRONLY | O_APPEND));
 			LOG_ERR(EINVAL, "Log file name too long.");
-			close((int)core_log_fd);
-			core_log_fd = (uintptr_t)-1;
 		}
-	} else if (0 != g_data.cmd_line_data.verbose) {
-		g_data.log_fd = (uintptr_t)open("/dev/stdout", (O_WRONLY | O_APPEND));
-		core_log_fd = g_data.log_fd;
+	} else if (0 != cmd_line_data.verbose) {
+		log_fd = open("/dev/stdout", (O_WRONLY | O_APPEND));
 	}
-	fd_set_nonblocking(core_log_fd, 1);
+	close((int)g_log_fd);
+	g_log_fd = (uintptr_t)log_fd;
+	fd_set_nonblocking(g_log_fd, 1);
 	log_write("\n\n\n\n", 4);
-	LOG_INFO(PACKAGE_NAME" "PACKAGE_VERSION": started");
+	LOG_INFO(PACKAGE_STRING": started");
 #ifdef DEBUG
 	LOG_INFO("Build: "__DATE__" "__TIME__", DEBUG");
 #else
@@ -368,20 +353,21 @@ main(int argc, char *argv[]) {
 	/* System resource limits. */
 	if (0 == MSD_CFG_GET_VAL_DATA(NULL, &data, &data_size,
 	    "systemResourceLimits", NULL)) {
-		sys_res_limits_load_xml_apply(data, data_size);
+		sys_res_limits_xml(data, data_size);
 	}
 
 	/* Thread pool settings. */
-	thrp_def_settings(&thrp_s);
-	if (0 == MSD_CFG_GET_VAL_DATA(NULL, &data, &data_size, "threadPool", NULL)) {
-		thrp_xml_load_settings(data, data_size, &thrp_s);
+	tp_settings_def(&tp_s);
+	if (0 == MSD_CFG_GET_VAL_DATA(NULL, &data, &data_size,
+	    "threadPool", NULL)) {
+		tp_settings_load_xml(data, data_size, &tp_s);
 	}
-	error = thrp_create(&thrp_s, &g_data.thrp);
+	error = tp_create(&tp_s, &tp);
 	if (0 != error) {
-		LOG_ERR(error, "thrp_create()");
+		LOG_ERR(error, "tp_create()");
 		goto err_out;
 	}
-	thrp_threads_create(g_data.thrp, 1);// XXX exit rewrite
+	tp_threads_create(tp, 1);// XXX exit rewrite
 
 
 	/* HTTP server settings. */
@@ -390,14 +376,14 @@ main(int argc, char *argv[]) {
 		LOG_INFO("No HTTP server settings, nothink to do...");
 		goto err_out;
 	}
-	http_srv_def_settings(1, PACKAGE"/"VERSION, 1, &http_s);
+	http_srv_def_settings(1, PACKAGE_NAME"/"PACKAGE_VERSION, 1, &http_s);
 	http_s.req_p_flags = (HTTP_SRV_REQ_P_F_CONNECTION | HTTP_SRV_REQ_P_F_HOST);
 	http_s.resp_p_flags = (HTTP_SRV_RESP_P_F_CONN_CLOSE | HTTP_SRV_RESP_P_F_SERVER | HTTP_SRV_RESP_P_F_CONTENT_LEN);
 	ccb.on_req_rcv = msd_http_srv_on_req_rcv_cb;
 	ccb.on_rep_snd = NULL;
 	ccb.on_destroy = NULL;
 
-	error = http_srv_xml_load_start(data, data_size, g_data.thrp,
+	error = http_srv_xml_load_start(data, data_size, tp,
 	    NULL, &ccb, &http_s, &g_data,
 	    &g_data.http_srv);
  	if (0 != error) {
@@ -424,7 +410,7 @@ main(int argc, char *argv[]) {
 		msd_src_profile_load(data, data_size, &g_data.src_params);
 		msd_src_conn_profile_load(data, data_size, &g_data.src_conn_params);
 	}
-	error = str_hubs_bckt_create(g_data.thrp, PACKAGE"/"VERSION, &g_data.hub_params,
+	error = str_hubs_bckt_create(tp, PACKAGE_NAME"/"PACKAGE_VERSION, &g_data.hub_params,
 	    &g_data.src_params, &g_data.shbskt);
 	if (0 != error) {
 		LOG_ERR(error, "str_hubs_bckt_create()");
@@ -433,33 +419,35 @@ main(int argc, char *argv[]) {
     } /* Done with config. */
 
 
-	if (0 == core_info_limits(g_data.syslimits, sizeof(g_data.syslimits), &tm)) {
+	if (0 == info_limits((char*)g_data.syslimits,
+	    (sizeof(g_data.syslimits) - 1), &tm)) {
 		g_data.syslimits_size = tm;
 	}
-	if (0 == core_info_sysinfo(g_data.sysinfo, sizeof(g_data.sysinfo), &tm)) {
+	if (0 == info_sysinfo((char*)g_data.sysinfo,
+	    sizeof(g_data.sysinfo), &tm)) {
 		g_data.sysinfo_size = tm;
 	}
-	core_info_sysres(&g_data.sysres, NULL, 0, NULL);
+	info_sysres(&g_data.sysres, NULL, 0, NULL);
 
-	thrp_signal_handler_add_thrp(g_data.thrp);
-	signal_install(thrp_signal_handler);
-	write_pid(g_data.cmd_line_data.pid_file_name); // Store pid to file
+	tp_signal_handler_add_tp(tp);
+	signal_install(tp_signal_handler);
 
-	set_user_and_group(g_data.cmd_line_data.pw_uid, g_data.cmd_line_data.pw_gid); // drop rights
+	write_pid(cmd_line_data.pid_file_name); /* Store pid to file. */
+	set_user_and_group(cmd_line_data.pw_uid, cmd_line_data.pw_gid); /* Drop rights. */
 
 	/* Receive and process packets. */
-	thrp_thread_attach_first(g_data.thrp);
-	thrp_shutdown_wait(g_data.thrp);
+	tp_thread_attach_first(tp);
+	tp_shutdown_wait(tp);
 
 	/* Deinitialization... */
 	http_srv_shutdown(g_data.http_srv); /* No more new clients. */
 	http_srv_destroy(g_data.http_srv); /* AFTER radius is shut down! */
 	str_hubs_bckt_destroy(g_data.shbskt);
-	if (NULL != g_data.cmd_line_data.pid_file_name) {
-		unlink(g_data.cmd_line_data.pid_file_name); // Remove pid file
+	if (NULL != cmd_line_data.pid_file_name) {
+		unlink(cmd_line_data.pid_file_name); // Remove pid file
 	}
 
-	thrp_destroy(g_data.thrp);
+	tp_destroy(tp);
 	LOG_INFO("exiting.");
 	close((int)g_data.log_fd);
 	free(cfg_file_buf);
@@ -480,7 +468,7 @@ msd_http_srv_hub_attach(http_srv_cli_p cli, uint8_t *hub_name, size_t hub_name_s
 	http_srv_req_p req;
 	const uint8_t *ptm;
 	size_t tm;
-	io_task_p iotask;
+	tp_task_p tptask;
 	uintptr_t skt;
 
 	LOGD_EV("...");
@@ -488,14 +476,14 @@ msd_http_srv_hub_attach(http_srv_cli_p cli, uint8_t *hub_name, size_t hub_name_s
 	if (NULL == cli || NULL == hub_name)
 		return (EINVAL);
 
-	iotask = http_srv_cli_get_iotask(cli);
-	skt = io_task_ident_get(iotask);
+	tptask = http_srv_cli_get_tptask(cli);
+	skt = tp_task_ident_get(tptask);
 	/* Extract tcpCC, "User-Agent". */
 	req = http_srv_cli_get_req(cli);
 	/* tcpcc. */
 	if (0 == http_query_val_get(req->line.query, req->line.query_size,
 	    (const uint8_t*)"tcpcc", 5, &ptm, &tm)) {
-		io_net_set_tcp_cc(skt, (const char*)ptm, tm);
+		skt_set_tcp_cc(skt, (const char*)ptm, tm);
 	}
 	/* Extract "User-Agent". */
 	if (0 != http_hdr_val_get(req->hdr, req->hdr_size,
@@ -531,7 +519,7 @@ msd_http_srv_hub_attach(http_srv_cli_p cli, uint8_t *hub_name, size_t hub_name_s
 		str_hub_cli_destroy(NULL, strh_cli);
 		LOG_ERR(error, "str_hub_cli_attach()");
 	} else {
-		io_task_flags_del(iotask, IO_TASK_F_CLOSE_ON_DESTROY);
+		tp_task_flags_del(tptask, TP_TASK_F_CLOSE_ON_DESTROY);
 		http_srv_cli_free(cli);
 	}
 	return (error);
@@ -568,7 +556,7 @@ msd_http_req_url_parse(http_srv_req_p req, struct sockaddr_storage *ssaddr,
 		if (0 == http_query_val_get(req->line.query, 
 		    req->line.query_size, (const uint8_t*)"ifindex", 7,
 		    &ptm, &tm)) {
-			ifindex = UStr8ToUNum32(ptm, tm);
+			ifindex = ustr2u32(ptm, tm);
 		} else { /* Default value. */
 			if (NULL != if_index) {
 				ifindex = (*if_index);
