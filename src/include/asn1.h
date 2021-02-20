@@ -32,14 +32,14 @@
 #define __ASN_1_H__
 
 #ifdef _WINDOWS
-#define EINVAL		ERROR_INVALID_HANDLE
-#define ESPIPE		2
-#define EBADMSG		3
-#define EDOM		4
-#define EOVERFLOW	ERROR_BUFFER_OVERFLOW
+#	define EINVAL		ERROR_INVALID_HANDLE
+#	define ESPIPE		2
+#	define EBADMSG		3
+#	define EDOM		4
+#	define EOVERFLOW	ERROR_BUFFER_OVERFLOW
 #else
-#include <sys/types.h>
-#include <inttypes.h>
+#	include <sys/types.h>
+#	include <inttypes.h>
 #endif
 
 

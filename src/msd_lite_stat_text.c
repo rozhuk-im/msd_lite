@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012 - 2014 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2012 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,8 +31,8 @@
 #include <sys/param.h>
 
 #ifdef __linux__ /* Linux specific code. */
-#define _GNU_SOURCE /* See feature_test_macros(7) */
-#define __USE_GNU 1
+#	define _GNU_SOURCE /* See feature_test_macros(7) */
+#	define __USE_GNU 1
 #endif /* Linux specific code. */
 
 #include <sys/types.h>
@@ -53,7 +53,7 @@
 #include <time.h>
 #include <string.h> /* bcopy, bzero, memcpy, memmove, memset, strerror... */
 
-#include "core_macro.h"
+#include "macro_helpers.h"
 #include "core_io_buf.h"
 #include "core_io_task.h"
 #include "core_io_net.h"
@@ -67,7 +67,7 @@
 
 
 
-int		gen_sock_tcp_stat_text(uintptr_t skt, char *tabs, io_buf_p buf);
+int		gen_sock_tcp_stat_text(uintptr_t skt, const char *tabs, io_buf_p buf);
 static void	gen_hub_stat_text_entry_enum_cb(thrpt_p thrpt, str_hub_p str_hub,
 		    void *udata);
 static void	gen_hub_stat_text_enum_done_cb(thrpt_p thrpt, size_t send_msg_cnt,
@@ -76,7 +76,7 @@ static void	gen_hub_stat_text_enum_done_cb(thrpt_p thrpt, size_t send_msg_cnt,
 
 
 int
-gen_sock_tcp_stat_text(uintptr_t skt, char *tabs, io_buf_p buf) {
+gen_sock_tcp_stat_text(uintptr_t skt, const char *tabs, io_buf_p buf) {
 	socklen_t optlen;
 	struct tcp_info info;
 	char tcpi_opts[64];
@@ -85,38 +85,43 @@ gen_sock_tcp_stat_text(uintptr_t skt, char *tabs, io_buf_p buf) {
 	if (NULL == buf)
 		return (EINVAL);
 	optlen = sizeof(info);
-	if (0 != getsockopt(skt, IPPROTO_TCP, TCP_INFO, &info, &optlen))
+	if (0 != getsockopt((int)skt, IPPROTO_TCP, TCP_INFO, &info, &optlen))
 		return (errno);
-	if (10 < info.tcpi_state)
+	if (10 < info.tcpi_state) {
 		info.tcpi_state = 11; /* unknown */
+	}
 	tm = 0;
-	if (0 != (info.tcpi_options & TCPI_OPT_TIMESTAMPS))
-		tm += snprintf((tcpi_opts + tm), ((sizeof(tcpi_opts) - 1) - tm), "TIMESTAMPS ");
-	if (0 != (info.tcpi_options & TCPI_OPT_SACK))
-		tm += snprintf((tcpi_opts + tm), ((sizeof(tcpi_opts) - 1) - tm), "SACK ");
-	if (0 != (info.tcpi_options & TCPI_OPT_WSCALE))
-		tm += snprintf((tcpi_opts + tm), ((sizeof(tcpi_opts) - 1) - tm), "WSCALE ");
-	if (0 != (info.tcpi_options & TCPI_OPT_ECN))
-		tm += snprintf((tcpi_opts + tm), ((sizeof(tcpi_opts) - 1) - tm), "ECN ");
+	if (0 != (info.tcpi_options & TCPI_OPT_TIMESTAMPS)) {
+		tm += (size_t)snprintf((tcpi_opts + tm), (sizeof(tcpi_opts) - tm), "TIMESTAMPS ");
+	}
+	if (0 != (info.tcpi_options & TCPI_OPT_SACK)) {
+		tm += (size_t)snprintf((tcpi_opts + tm), (sizeof(tcpi_opts) - tm), "SACK ");
+	}
+	if (0 != (info.tcpi_options & TCPI_OPT_WSCALE)) {
+		tm += (size_t)snprintf((tcpi_opts + tm), (sizeof(tcpi_opts) - tm), "WSCALE ");
+	}
+	if (0 != (info.tcpi_options & TCPI_OPT_ECN)) {
+		tm += (size_t)snprintf((tcpi_opts + tm), (sizeof(tcpi_opts) - tm), "ECN ");
+	}
 
 #ifdef BSD /* BSD specific code. */
-	char *tcpi_state[] = {
-		(char*)"CLOSED",
-		(char*)"LISTEN",
-		(char*)"SYN_SENT",
-		(char*)"SYN_RECEIVED",
-		(char*)"ESTABLISHED",
-		(char*)"CLOSE_WAIT",
-		(char*)"FIN_WAIT_1",
-		(char*)"CLOSING",
-		(char*)"LAST_ACK",
-		(char*)"FIN_WAIT_2",
-		(char*)"TIME_WAIT",
-		(char*)"UNKNOWN"
+	const char *tcpi_state[] = {
+		"CLOSED",
+		"LISTEN",
+		"SYN_SENT",
+		"SYN_RECEIVED",
+		"ESTABLISHED",
+		"CLOSE_WAIT",
+		"FIN_WAIT_1",
+		"CLOSING",
+		"LAST_ACK",
+		"FIN_WAIT_2",
+		"TIME_WAIT",
+		"UNKNOWN"
 	};
 
 	if (0 != (info.tcpi_options & TCPI_OPT_TOE))
-		tm += snprintf((tcpi_opts + tm), ((sizeof(tcpi_opts) - 1) - tm), "TOE ");
+		tm += (size_t)snprintf((tcpi_opts + tm), (sizeof(tcpi_opts) - tm), "TOE ");
 
 	IO_BUF_PRINTF(buf,
 	    "%sTCP FSM state: %s\r\n"
@@ -152,19 +157,19 @@ gen_sock_tcp_stat_text(uintptr_t skt, char *tabs, io_buf_p buf) {
 	    tabs, info.tcpi_rcv_ooopack, tabs, info.tcpi_snd_zerowin);
 #endif /* BSD specific code. */
 #ifdef __linux__ /* Linux specific code. */
-	char *tcpi_state[] = {
-		(char*)"ESTABLISHED",
-		(char*)"SYN_SENT",
-		(char*)"SYN_RECEIVED",
-		(char*)"FIN_WAIT_1",
-		(char*)"FIN_WAIT_2",
-		(char*)"TIME_WAIT",
-		(char*)"CLOSED",
-		(char*)"CLOSE_WAIT",
-		(char*)"LAST_ACK",
-		(char*)"LISTEN",
-		(char*)"CLOSING",
-		(char*)"UNKNOWN"
+	const char *tcpi_state[] = {
+		"ESTABLISHED",
+		"SYN_SENT",
+		"SYN_RECEIVED",
+		"FIN_WAIT_1",
+		"FIN_WAIT_2",
+		"TIME_WAIT",
+		"CLOSED",
+		"CLOSE_WAIT",
+		"LAST_ACK",
+		"LISTEN",
+		"CLOSING",
+		"UNKNOWN"
 	};
 
 	IO_BUF_PRINTF(buf,
@@ -268,9 +273,10 @@ gen_hub_stat_text_entry_enum_cb(thrpt_p thrpt, str_hub_p str_hub, void *udata) {
 	/* Sources. */
 	IO_BUF_COPYIN_CSTR(buf, "  Source: multicast");
 	conn_mc = &str_hub->src_conn_params.mc;
-	if (0 != ss_to_str_addr_port(&conn_mc->udp.addr, straddr,
-	    sizeof(straddr), NULL))
-		memcpy(straddr, "<unable to format>", 20);
+	if (0 != sa_addr_port_to_str(&conn_mc->udp.addr, straddr,
+	    sizeof(straddr), NULL)) {
+		memcpy(straddr, "<unable to format>", 19);
+	}
 	ifname[0] = 0;
 	if_indextoname(conn_mc->if_index, ifname);
 	IO_BUF_PRINTF(buf, " %s@%s	",
@@ -282,22 +288,25 @@ gen_hub_stat_text_entry_enum_cb(thrpt_p thrpt, str_hub_p str_hub, void *udata) {
 
 	/* Clients. */
 	TAILQ_FOREACH_SAFE(strh_cli, &str_hub->cli_head, next, strh_cli_temp) {
-		if (0 != ss_to_str_addr_port(&strh_cli->remonte_addr,
-		    straddr, sizeof(straddr), NULL))
-			memcpy(straddr, "<unable to format>", 20);
-		if (0 != ss_to_str_addr_port(&strh_cli->xreal_addr,
-		    straddr2, sizeof(straddr2), NULL))
-			memcpy(straddr, "<unable to format>", 20);
+		if (0 != sa_addr_port_to_str(&strh_cli->remonte_addr,
+		    straddr, sizeof(straddr), NULL)) {
+			memcpy(straddr, "<unable to format>", 19);
+		}
+		if (0 != sa_addr_port_to_str(&strh_cli->xreal_addr,
+		    straddr2, sizeof(straddr2), NULL)) {
+			memcpy(straddr, "<unable to format>", 19);
+		}
 		//&cli_ud->xreal_addr
-		time_conn = difftime(cur_time, strh_cli->conn_time);
+		time_conn = (cur_time - strh_cli->conn_time);
 		fmt_as_uptime(&time_conn, str_time, sizeof(str_time));
 		
 		if (0 != io_net_get_tcp_cc(strh_cli->skt,
-		    ifname, sizeof(ifname), NULL))
+		    ifname, sizeof(ifname), NULL)) {
 			memcpy(ifname, "<unable to get>", 16);
-		if (0 != io_net_get_tcp_maxseg(strh_cli->skt,
-		    (int*)&i))
+		}
+		if (0 != io_net_get_tcp_maxseg(strh_cli->skt, (int*)&i)) {
 			i = 0;
+		}
 
 		IO_BUF_PRINTF(buf,
 		    "	%s (%s)	[conn time: %s, flags: %u, cc: %s, maxseg: %"PRIu32"]	[user agent: %s]\r\n",
@@ -305,25 +314,27 @@ gen_hub_stat_text_entry_enum_cb(thrpt_p thrpt, str_hub_p str_hub, void *udata) {
 		    (char*)strh_cli->user_agent
 		);
 		gen_sock_tcp_stat_text(strh_cli->skt,
-		    (char*)"	    ", buf);
+		    "	    ", buf);
 	}
 }
 static void
 gen_hub_stat_text_enum_done_cb(thrpt_p thrpt __unused, size_t send_msg_cnt __unused,
     size_t error_cnt, void *udata) {
 	http_srv_cli_p cli = udata;
-	struct iovec iov[1];
+	http_srv_resp_p	resp = http_srv_cli_get_resp(cli);
+	static const char *cttype = 	"Content-Type: text/plain\r\n"
+					"Pragma: no-cache";
 
 	if (0 == error_cnt) {
-		http_srv_cli_add_resp_p_flags(cli, HTTP_SRV_RESP_P_F_CONTENT_SIZE);
-		iov[0].iov_base = (void*)
-		    "Content-Type: text/plain\r\n"
-		    "Pragma: no-cache";
-		iov[0].iov_len = 42;
-		http_srv_snd(cli, 200, NULL, 0, (struct iovec*)&iov, 1);
+		resp->status_code = 200;
+		resp->p_flags |= HTTP_SRV_RESP_P_F_CONTENT_LEN;
+		resp->hdrs_count = 1;
+		resp->hdrs[0].iov_base = MK_RW_PTR(cttype);
+		resp->hdrs[0].iov_len = 42;
 	} else {
-		http_srv_snd(cli, 500, NULL, 0, NULL, 0);
+		resp->status_code = 500;
 	}
+	http_srv_resume_responce(cli);
 }
 
 
@@ -339,6 +350,7 @@ gen_stat_text(const char *package_name, const char *package_version,
 	http_srv_p http_srv;
 	thrp_p thrp;
 	io_buf_p buf;
+	struct tm stime;
 	str_hubs_stat_t hstat, *stat;
 	http_srv_stat_t http_srv_stat;
 
@@ -358,12 +370,14 @@ gen_stat_text(const char *package_name, const char *package_version,
 		return (error);
 	buf = http_srv_cli_get_buf(cli);
 
-	time_work = difftime(thrpt_gettime(NULL, 0), http_srv_stat.start_time_abs);
-	if (0 == time_work) /* Prevent division by zero. */
+	time_work = (thrpt_gettime(NULL, 0) - http_srv_stat.start_time_abs);
+	if (0 == time_work) { /* Prevent division by zero. */
 		time_work ++;
+	}
 	/* Server stat. */
-	ctime_r(&http_srv_stat.start_time, start_time);
-	start_time[24] = 0; /* Remove CRLF from end. */
+	localtime_r(&http_srv_stat.start_time, &stime);
+	strftime(start_time, sizeof(start_time),
+	    "%d.%m.%Y %H:%M:%S", &stime);
 	fmt_as_uptime(&time_work, straddr, (sizeof(straddr) - 1));
 	IO_BUF_PRINTF(buf,
 	    "Server: %s %s ("__DATE__" "__TIME__")\r\n"
@@ -386,7 +400,7 @@ gen_stat_text(const char *package_name, const char *package_version,
 	    http_srv_stat.http_errors,
 	    http_srv_stat.insecure_requests,
 	    http_srv_stat.unhandled_requests,
-	    (http_srv_stat.requests_total / time_work),
+	    (http_srv_stat.requests_total / (uint64_t)time_work),
 	    http_srv_stat.requests_total);
 	IO_BUF_PRINTF(buf, "Per Thread stat\r\n");
 	for (i = 0; i < thread_cnt; i ++) {
@@ -434,4 +448,3 @@ gen_stat_text(const char *package_name, const char *package_version,
 	io_buf_copyin(buf, sysinfo, sysinfo_size);
 	return (0);
 }
-

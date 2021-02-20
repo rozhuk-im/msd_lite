@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012 - 2014 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2012 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,8 +31,8 @@
 #include <sys/param.h>
 
 #ifdef __linux__ /* Linux specific code. */
-#define _GNU_SOURCE /* See feature_test_macros(7) */
-#define __USE_GNU 1
+#	define _GNU_SOURCE /* See feature_test_macros(7) */
+#	define __USE_GNU 1
 #endif /* Linux specific code. */
 
 #include <sys/types.h>
@@ -50,8 +50,9 @@
 #include <time.h>
 #include <errno.h>
 
-#include "core_macro.h"
+#include "macro_helpers.h"
 #include "core_thrp.h"
+#include "core_thrp_msg.h"
 #include "core_io_task.h"
 #include "core_io_net.h"
 #include "core_net_helpers.h"
@@ -61,7 +62,7 @@
 #include "rtp.h"
 #include "mpeg2ts.h"
 #include "md5.h"
-#include "mem_find.h"
+#include "mem_helpers.h"
 #include "HTTP.h"
 #include "stream_sys.h"
 
@@ -86,12 +87,11 @@ typedef struct str_hubs_bckt_enum_data_s { /* thread message sync data. */
 	str_hubs_bckt_p		shbskt;
 	str_hubs_bckt_enum_cb	enum_cb;
 	void			*udata;
-	thrpt_msg_done_cb done_cb;
+	thrpt_msg_done_cb	done_cb;
 } str_hubs_bckt_enum_data_t, *str_hubs_bckt_enum_data_p;
 
 
 
-size_t	str_hub_thread_num_from_hash(thrp_p thrp, size_t hash);
 thrpt_p	str_hub_thrpt_get_by_name(thrp_p thrp, const uint8_t *name, size_t name_size);
 
 static void	str_hubs_bckt_destroy_msg_cb(thrpt_p thrpt, void *udata);
@@ -103,7 +103,7 @@ static void	str_hubs_bckt_enum_done_cb(thrpt_p thrpt, size_t send_msg_cnt,
 void		str_hubs_bckt_timer_service(str_hubs_bckt_p shbskt,
 		    str_hub_p str_hub, str_hubs_stat_p stat);
 static void	str_hubs_bckt_timer_msg_cb(thrpt_p thrpt, void *udata);
-static void	str_hubs_bckt_timer_cb(thrp_event_p ev, thrp_udata_p udata);
+static void	str_hubs_bckt_timer_cb(thrp_event_p ev, thrp_udata_p thrp_udata);
 
 int	str_hub_create_int(str_hubs_bckt_p shbskt, thrpt_p thrpt,
 	    uint8_t *name, size_t name_size,
@@ -115,7 +115,7 @@ void	str_hub_cli_attach_msg_cb(thrpt_p thrpt, void *udata);
 int	str_hub_send_to_client(str_hub_p str_hub, str_hub_cli_p strh_cli,
 	    size_t *transfered_size);
 int	str_hub_send_to_clients(str_hub_p str_hub);
-static int str_src_recv_mc_cb(io_task_p iotask, int error, int eof,
+static int str_src_recv_mc_cb(io_task_p iotask, int error, uint32_t eof,
 	    size_t data2transfer_size, void *arg);
 int	str_src_r_buf_alloc(str_hub_p str_hub);
 void	str_src_r_buf_free(str_hub_p str_hub);
@@ -123,51 +123,46 @@ void	str_src_r_buf_free(str_hub_p str_hub);
 
 
 /* XXX Thread pool balancer */
-size_t
-str_hub_thread_num_from_hash(thrp_p thrp, size_t hash) {
-	size_t thread_num, thread_cnt;
-
-	hash &= 0xff;
-	thread_cnt = thrp_thread_count_max_get(thrp);
-	//thread_num = (/*(hash / thread_cnt) ^*/ (hash % thread_cnt));
-	thread_num = ((thread_cnt * hash) / 256);
-	if (thread_cnt < thread_num)
-		thread_num = (thread_cnt - 1);
-	return (thread_num);
-}
 thrpt_p
 str_hub_thrpt_get_by_name(thrp_p thrp, const uint8_t *name, size_t name_size) {
-	size_t thread_num;
+	size_t thread_num, thread_cnt;
 	uint8_t hash[MD5_HASH_SIZE];
 
-	md5_get_digest((void*)name, name_size, hash);
-	thread_num = str_hub_thread_num_from_hash(thrp, data_xor8(hash, sizeof(hash)));
+	md5_get_digest(name, name_size, hash);
+
+	thread_cnt = thrp_thread_count_max_get(thrp);
+	//thread_num = (/*(hash / thread_cnt) ^*/ (hash % thread_cnt));
+	thread_num = ((thread_cnt * data_xor8(hash, sizeof(hash))) / 256);
+	if (thread_cnt < thread_num) {
+		thread_num = (thread_cnt - 1);
+	}
+
 	return (thrp_thread_get(thrp, thread_num));
 }
 
 
 void
-str_hub_params_def(str_hub_params_p p_ret) {
+str_hub_settings_def(str_hub_settings_p p_ret) {
 
 	if (NULL == p_ret)
 		return;
-	memset(p_ret, 0, sizeof(str_hub_params_t));
-	p_ret->flags = STR_HUB_P_DEF_FLAGS;
-	p_ret->ring_buf_size = STR_HUB_P_DEF_RING_BUF_SIZE;
-	p_ret->precache = STR_HUB_P_DEF_PRECAHE;
-	p_ret->snd_block_min_size = STR_HUB_P_DEF_SND_BLOCK_MIN_SIZE;
-	p_ret->skt_snd_buf = STR_HUB_P_DEF_SKT_SND_BUF;
+	mem_bzero(p_ret, sizeof(str_hub_settings_t));
+	p_ret->flags = STR_HUB_S_DEF_FLAGS;
+	p_ret->ring_buf_size = STR_HUB_S_DEF_RING_BUF_SIZE;
+	p_ret->precache = STR_HUB_S_DEF_PRECAHE;
+	p_ret->snd_block_min_size = STR_HUB_S_DEF_SND_BLOCK_MIN_SIZE;
+	p_ret->skt_snd_buf = STR_HUB_S_DEF_SKT_SND_BUF;
 }
 
 void
-str_src_params_def(str_src_params_p p_ret) {
+str_src_settings_def(str_src_settings_p p_ret) {
 	
 	if (NULL == p_ret)
 		return;
-	memset(p_ret, 0, sizeof(str_src_params_t));
-	p_ret->skt_rcv_buf = STR_SRC_P_DEF_SKT_RCV_BUF;
-	p_ret->skt_rcv_lowat = STR_SRC_P_DEF_SKT_RCV_LOWAT;
-	p_ret->rcv_timeout = STR_SRC_P_DEF_UDP_RCV_TIMEOUT;
+	mem_bzero(p_ret, sizeof(str_src_settings_t));
+	p_ret->skt_rcv_buf = STR_SRC_S_DEF_SKT_RCV_BUF;
+	p_ret->skt_rcv_lowat = STR_SRC_S_DEF_SKT_RCV_LOWAT;
+	p_ret->rcv_timeout = STR_SRC_S_DEF_UDP_RCV_TIMEOUT;
 }
 
 void
@@ -175,14 +170,14 @@ str_src_conn_def(str_src_conn_params_p src_conn_params) {
 
 	if (NULL == src_conn_params)
 		return;
-	memset(src_conn_params, 0, sizeof(str_src_conn_params_t));
+	mem_bzero(src_conn_params, sizeof(str_src_conn_params_t));
 	src_conn_params->mc.if_index = STR_SRC_CONN_DEF_IFINDEX;
 }
 
 
 int
-str_hubs_bckt_create(thrp_p thrp, const char *app_ver, str_hub_params_p hub_params,
-    str_src_params_p src_params, str_hubs_bckt_p *shbskt_ret) {
+str_hubs_bckt_create(thrp_p thrp, const char *app_ver, str_hub_settings_p hub_params,
+    str_src_settings_p src_params, str_hubs_bckt_p *shbskt_ret) {
 	int error;
 	str_hubs_bckt_p shbskt;
 	char osver[128];
@@ -190,7 +185,7 @@ str_hubs_bckt_create(thrp_p thrp, const char *app_ver, str_hub_params_p hub_para
 
 	if (NULL == shbskt_ret)
 		return (EINVAL);
-	shbskt = zalloc(sizeof(str_hubs_bckt_t) + (hub_params->cust_http_hdrs_size + 8));
+	shbskt = zalloc(sizeof(str_hubs_bckt_t) + hub_params->cust_http_hdrs_size + sizeof(void*));
 	if (NULL == shbskt)
 		return (ENOMEM);
 	thread_count_max = thrp_thread_count_max_get(thrp);
@@ -203,7 +198,7 @@ str_hubs_bckt_create(thrp_p thrp, const char *app_ver, str_hub_params_p hub_para
 		TAILQ_INIT(&shbskt->thr_data[i].hub_head);
 	}
 	/* Stream Hub Params */
-	memcpy(&shbskt->hub_params, hub_params, sizeof(str_hub_params_t));
+	memcpy(&shbskt->hub_params, hub_params, sizeof(str_hub_settings_t));
 	/* Copy custom HTTP headers to new buffer. */
 	shbskt->hub_params.cust_http_hdrs = (uint8_t*)(shbskt + 1);
 	if (NULL != hub_params->cust_http_hdrs &&
@@ -231,13 +226,15 @@ str_hubs_bckt_create(thrp_p thrp, const char *app_ver, str_hub_params_p hub_para
 	hub_params->snd_block_min_size *= 1024;
 	hub_params->skt_snd_buf *= 1024;
 	/* Correct values. */
-	if (hub_params->precache > hub_params->ring_buf_size)
+	if (hub_params->precache > hub_params->ring_buf_size) {
 		hub_params->precache = hub_params->ring_buf_size;
-	if (hub_params->snd_block_min_size > hub_params->skt_snd_buf)
+	}
+	if (hub_params->snd_block_min_size > hub_params->skt_snd_buf) {
 		hub_params->snd_block_min_size = hub_params->skt_snd_buf;
+	}
 
 	/* Stream src Params */
-	memcpy(&shbskt->src_params, src_params, sizeof(str_src_params_t));
+	memcpy(&shbskt->src_params, src_params, sizeof(str_src_settings_t));
 	/* Use short name. */
 	src_params = &shbskt->src_params;
 	/* Correct values. */
@@ -251,7 +248,7 @@ str_hubs_bckt_create(thrp_p thrp, const char *app_ver, str_hub_params_p hub_para
 	if (0 != core_info_get_os_ver("/", 1, osver,
 	    (sizeof(osver) - 1), NULL))
 		memcpy(osver, "Generic OS/1.0", 15);
-	shbskt->base_http_hdrs_size = snprintf((char*)shbskt->base_http_hdrs,
+	shbskt->base_http_hdrs_size = (size_t)snprintf((char*)shbskt->base_http_hdrs,
 	    sizeof(shbskt->base_http_hdrs),
 	    "Server: %s %s HTTP stream hub by Rozhuk Ivan\r\n"
 	    "Connection: close\r\n",
@@ -263,11 +260,12 @@ str_hubs_bckt_create(thrp_p thrp, const char *app_ver, str_hub_params_p hub_para
 	error = thrpt_ev_add_ex(thrp_thread_get_rr(shbskt->thrp), THRP_EV_TIMER,
 	    0, 0, 1000 /* 1 sec. */, &shbskt->service_tmr);
 	if (0 != error) {
-		LOGD_ERR(error, "hbucket_create()");
+		LOGD_ERR(error, "thrpt_ev_add_ex()");
 		goto err_out;
 	}
 
 	(*shbskt_ret) = shbskt;
+
 	return (0);
 
 err_out:
@@ -288,7 +286,7 @@ str_hubs_bckt_destroy(str_hubs_bckt_p shbskt) {
 	    str_hubs_bckt_destroy_msg_cb, shbskt);
 
 	free(shbskt->thr_data);
-	memfilld(shbskt, sizeof(str_hubs_bckt_t));
+	mem_filld(shbskt, sizeof(str_hubs_bckt_t));
 	free(shbskt);
 }
 static void
@@ -326,8 +324,10 @@ str_hubs_bckt_enum(str_hubs_bckt_p shbskt, str_hubs_bckt_enum_cb enum_cb,
 	error = thrpt_msg_cbsend(shbskt->thrp, NULL,
 	    (THRP_CBMSG_F_ONE_BY_ONE), str_hubs_bckt_enum_msg_cb,
 	    enum_data, str_hubs_bckt_enum_done_cb);
-	if (0 != error)
+	if (0 != error) {
 		free(enum_data);
+	}
+
 	return (error);
 }
 static void
@@ -363,7 +363,7 @@ str_hubs_bckt_stat_summary(str_hubs_bckt_p shbskt, str_hubs_stat_p stat) {
 	if (NULL == shbskt || NULL == stat)
 		return (EINVAL);
 	thread_cnt = thrp_thread_count_max_get(shbskt->thrp);
-	memset(stat, 0, sizeof(str_hubs_stat_t));
+	mem_bzero(stat, sizeof(str_hubs_stat_t));
 	for (i = 0; i < thread_cnt; i ++) {
 		stat->str_hub_count += shbskt->thr_data[i].stat.str_hub_count;
 		stat->cli_count += shbskt->thr_data[i].stat.cli_count;
@@ -377,7 +377,7 @@ str_hubs_bckt_stat_summary(str_hubs_bckt_p shbskt, str_hubs_stat_p stat) {
 void
 str_hubs_bckt_timer_service(str_hubs_bckt_p shbskt, str_hub_p str_hub,
     str_hubs_stat_p stat) {
-	str_src_params_p src_params = &shbskt->src_params;
+	str_src_settings_p src_params = &shbskt->src_params;
 	struct timespec *tp = &shbskt->tp_last_tmr_next;
 	uint64_t tm64;
 	time_t tmt;
@@ -409,7 +409,7 @@ str_hubs_bckt_timer_service(str_hubs_bckt_p shbskt, str_hub_p str_hub,
 	}
 	/* No traffic check. */
 	if (0 != src_params->rcv_timeout) {
-		tmt = (time_t)(str_hub->tp_last_recv.tv_sec + src_params->rcv_timeout);
+		tmt = (str_hub->tp_last_recv.tv_sec + (time_t)src_params->rcv_timeout);
 		if (tmt < tp->tv_sec ||
 		    (tmt == tp->tv_sec && str_hub->tp_last_recv.tv_nsec < tp->tv_nsec)) {
 			str_hub_destroy_int(str_hub);
@@ -417,7 +417,6 @@ str_hubs_bckt_timer_service(str_hubs_bckt_p shbskt, str_hub_p str_hub,
 		}
 	}
 }
-
 static void
 str_hubs_bckt_timer_msg_cb(thrpt_p thrpt, void *udata) {
 	str_hubs_bckt_p shbskt = (str_hubs_bckt_p)udata;
@@ -427,7 +426,7 @@ str_hubs_bckt_timer_msg_cb(thrpt_p thrpt, void *udata) {
 
 	//LOGD_EV("...");
 	thread_num = thrp_thread_get_num(thrpt);
-	memset(&stat, 0, sizeof(str_hubs_stat_t));
+	mem_bzero(&stat, sizeof(str_hubs_stat_t));
 
 	/* Enum all Stream Hubs associated with this thread. */
 	TAILQ_FOREACH_SAFE(str_hub, &shbskt->thr_data[thread_num].hub_head, next,
@@ -438,17 +437,17 @@ str_hubs_bckt_timer_msg_cb(thrpt_p thrpt, void *udata) {
 	memcpy(&shbskt->thr_data[thread_num].stat, &stat, sizeof(str_hubs_stat_t));
 }
 static void
-str_hubs_bckt_timer_cb(thrp_event_p ev __unused, thrp_udata_p udata) {
-	str_hubs_bckt_p shbskt = (str_hubs_bckt_p)udata->ident;
+str_hubs_bckt_timer_cb(thrp_event_p ev __unused, thrp_udata_p thrp_udata) {
+	str_hubs_bckt_p shbskt = (str_hubs_bckt_p)thrp_udata->ident;
 
 	//LOGD_EV("...");
 	if (NULL == shbskt)
 		return;
 	memcpy(&shbskt->tp_last_tmr, &shbskt->tp_last_tmr_next, sizeof(struct timespec));
-	thrpt_gettimev(udata->thrpt, 0, &shbskt->tp_last_tmr_next);
+	thrpt_gettimev(thrp_udata->thrpt, 0, &shbskt->tp_last_tmr_next);
 	/* Broadcast to all threads. */
-	thrpt_msg_bsend(shbskt->thrp, udata->thrpt, THRP_MSG_F_SELF_DIRECT,
-	    str_hubs_bckt_timer_msg_cb, shbskt);
+	thrpt_msg_bsend(shbskt->thrp, thrp_udata->thrpt,
+	    THRP_MSG_F_SELF_DIRECT, str_hubs_bckt_timer_msg_cb, shbskt);
 }
 
 
@@ -457,15 +456,15 @@ str_hub_create_int(str_hubs_bckt_p shbskt, thrpt_p thrpt, uint8_t *name, size_t 
     str_src_conn_params_p src_conn_params, str_hub_p *str_hub_ret) {
 	int error;
 	str_hub_p str_hub;
-	uintptr_t skt = -1;
-	str_src_params_p src_params;
+	uintptr_t skt;
+	str_src_settings_p src_params;
 	str_src_conn_udp_p conn_udp;
 
 	LOGD_EV("...");
 
 	if (NULL == shbskt || NULL == name || 0 == name_size || NULL == str_hub_ret)
 		return (EINVAL);
-	str_hub = zalloc((sizeof(str_hub_t) + name_size + 4));
+	str_hub = zalloc((sizeof(str_hub_t) + name_size + sizeof(void*)));
 	if (NULL == str_hub)
 		return (ENOMEM);
 
@@ -481,11 +480,17 @@ str_hub_create_int(str_hubs_bckt_p shbskt, thrpt_p thrpt, uint8_t *name, size_t 
 	src_params = &shbskt->src_params;
 	memcpy(&str_hub->src_conn_params, src_conn_params, sizeof(str_src_conn_params_t));
 	conn_udp = &src_conn_params->udp;
-	error = io_net_bind(&conn_udp->addr, SOCK_DGRAM, &skt);
+	error = io_net_bind(&conn_udp->addr, SOCK_DGRAM, IPPROTO_UDP,
+	    (SO_F_NONBLOCK | SO_F_REUSEADDR | SO_F_REUSEPORT),
+	    &skt);
 	if (0 != error) /* Bind to mc addr fail, try bind inaddr_any. */
-		error = io_net_bind_ap(SOCK_DGRAM, conn_udp->addr.ss_family,
-		    NULL, sa_get_port(&conn_udp->addr), &skt);
+		error = io_net_bind_ap(conn_udp->addr.ss_family,
+		    NULL, sa_port_get(&conn_udp->addr),
+		    SOCK_DGRAM, IPPROTO_UDP,
+		    (SO_F_NONBLOCK | SO_F_REUSEADDR | SO_F_REUSEPORT),
+		    &skt);
 	if (0 != error) {
+		skt = (uintptr_t)-1;
 		LOG_ERR(error, "io_net_mc_bind()");
 		goto err_out;
 	}
@@ -521,7 +526,7 @@ str_hub_create_int(str_hubs_bckt_p shbskt, thrpt_p thrpt, uint8_t *name, size_t 
 
 err_out:
 	/* Error. */
-	close(skt);
+	close((int)skt);
 	str_hub_destroy_int(str_hub);
 	(*str_hub_ret) = NULL;
 	LOG_ERR(error, "...");
@@ -543,14 +548,15 @@ str_hub_destroy_int(str_hub_p str_hub) {
 	    str_hub, next);
 
 	/* Destroy all connected clients. */
-	TAILQ_FOREACH_SAFE(strh_cli, &str_hub->cli_head, next, strh_cli_temp)
+	TAILQ_FOREACH_SAFE(strh_cli, &str_hub->cli_head, next, strh_cli_temp) {
 		str_hub_cli_destroy(str_hub, strh_cli);
+	}
 
 	LOG_INFO_FMT("%s: Destroyed.", str_hub->name);
 
 	str_src_r_buf_free(str_hub);
 
-	memfilld(str_hub, (sizeof(str_hub_t) + str_hub->name_size));
+	mem_filld(str_hub, (sizeof(str_hub_t) + str_hub->name_size));
 	free(str_hub);
 }
 
@@ -563,7 +569,7 @@ str_hub_cli_alloc(uintptr_t skt, const char *ua, size_t ua_size) {
 
 	if (STR_HUB_CLI_USER_AGENT_MAX_SIZE < ua_size)
 		ua_size = STR_HUB_CLI_USER_AGENT_MAX_SIZE;
-	strh_cli = zalloc(sizeof(str_hub_cli_t) + (ua_size + 4));
+	strh_cli = zalloc(sizeof(str_hub_cli_t) + ua_size + sizeof(void*));
 	if (NULL == strh_cli)
 		return (NULL);
 	/* Set. */
@@ -590,7 +596,7 @@ str_hub_cli_destroy(str_hub_p str_hub, str_hub_cli_p strh_cli) {
 		return;
 	if (NULL != str_hub) {
 		if (0 != LOG_IS_ENABLED()) {
-			ss_to_str_addr_port(&strh_cli->remonte_addr, straddr,
+			sa_addr_port_to_str(&strh_cli->remonte_addr, straddr,
 			    sizeof(straddr), NULL);
 			LOG_INFO_FMT("%s - %s: deattached, cli_count = %zu",
 			    str_hub->name, straddr, (str_hub->cli_count - 1));
@@ -601,22 +607,22 @@ str_hub_cli_destroy(str_hub_p str_hub, str_hub_cli_p strh_cli) {
 	}
 
 	/* Send HTTP headers if needed. */
-	if (0 == (STR_HUB_CLI_F_HTTP_HDRS_SENDED & strh_cli->flags) &&
+	if (0 == (STR_HUB_CLI_STATE_F_HTTP_HDRS_SENDED & strh_cli->flags) &&
 	    0 == strh_cli->offset) {
-		memset(&mhdr, 0, sizeof(mhdr));
+		iov[0].iov_base = MK_RW_PTR("HTTP/1.1 503 Service Unavailable\r\n");
+		iov[0].iov_len = 34;
+		iov[1].iov_base = str_hub->shbskt->base_http_hdrs;
+		iov[1].iov_len = str_hub->shbskt->base_http_hdrs_size;
+		iov[2].iov_base = MK_RW_PTR("\r\n");
+		iov[2].iov_len = 2;
+		mem_bzero(&mhdr, sizeof(mhdr));
 		mhdr.msg_iov = (struct iovec*)iov;
 		mhdr.msg_iovlen = 3;
-		iov[0].iov_base = (uint8_t*)"HTTP/1.1 503 Service Unavailable\r\n";
-		iov[0].iov_len = 34;
-		iov[1].iov_base = (uint8_t*)str_hub->shbskt->base_http_hdrs;
-		iov[1].iov_len = str_hub->shbskt->base_http_hdrs_size;
-		iov[2].iov_base = (uint8_t*)"\r\n";
-		iov[2].iov_len = 2;
-		sendmsg(strh_cli->skt, &mhdr, (MSG_DONTWAIT | MSG_NOSIGNAL));
+		sendmsg((int)strh_cli->skt, &mhdr, (MSG_DONTWAIT | MSG_NOSIGNAL));
 	}
 
-	close(strh_cli->skt);
-	memfilld(strh_cli, sizeof(str_hub_cli_t));
+	close((int)strh_cli->skt);
+	mem_filld(strh_cli, sizeof(str_hub_cli_t));
 	free(strh_cli);
 }
 
@@ -631,7 +637,7 @@ str_hub_cli_attach(str_hubs_bckt_p shbskt, str_hub_cli_p strh_cli,
 	if (NULL == shbskt || NULL == strh_cli || NULL == hub_name ||
 	    0 == hub_name_size || NULL == src_conn_params)
 		return (EINVAL);
-	cli_data = zalloc(sizeof(str_hub_cli_attach_cb_data_t) + hub_name_size + 8);
+	cli_data = zalloc(sizeof(str_hub_cli_attach_cb_data_t) + hub_name_size + sizeof(void*));
 	if (NULL == cli_data)
 		return (ENOMEM);
 	cli_data->shbskt = shbskt;
@@ -645,8 +651,10 @@ str_hub_cli_attach(str_hubs_bckt_p shbskt, str_hub_cli_p strh_cli,
 	thrpt = str_hub_thrpt_get_by_name(shbskt->thrp, hub_name, hub_name_size);
 	error = thrpt_msg_send(thrpt, NULL, THRP_MSG_F_SELF_DIRECT,
 	    str_hub_cli_attach_msg_cb, cli_data);
-	if (0 != error)
+	if (0 != error) {
 		free(cli_data);
+	}
+
 	return (error);
 }
 void
@@ -654,7 +662,7 @@ str_hub_cli_attach_msg_cb(thrpt_p thrpt, void *udata) {
 	str_hub_cli_attach_cb_data_p cli_data = udata;
 	str_hub_p str_hub, str_hub_temp;
 	str_hub_cli_p strh_cli;
-	str_hub_params_p hub_params;
+	str_hub_settings_p hub_params;
 	char straddr[STR_ADDR_LEN];
 	size_t thread_num;
 	int error = -1;
@@ -677,7 +685,7 @@ str_hub_cli_attach_msg_cb(thrpt_p thrpt, void *udata) {
 		    &cli_data->src_conn_params, &str_hub);
 		if (0 != error) {
 			str_hub_cli_destroy(NULL, cli_data->strh_cli);
-			close(cli_data->strh_cli->skt);
+			close((int)cli_data->strh_cli->skt);
 			free(cli_data);
 			LOG_ERR(error, "str_hub_create()");
 			return;
@@ -693,7 +701,7 @@ str_hub_cli_attach_msg_cb(thrpt_p thrpt, void *udata) {
 	error = io_net_rcv_tune(strh_cli->skt, STR_HUB_CLI_RECV_BUF, STR_HUB_CLI_RECV_LOWAT);
 	if (0 != error) {
 		if (0 != LOG_IS_ENABLED()) {
-			ss_to_str_addr_port(&strh_cli->remonte_addr, straddr, sizeof(straddr), NULL);
+			sa_addr_port_to_str(&strh_cli->remonte_addr, straddr, sizeof(straddr), NULL);
 			LOG_ERR_FMT(error, "%s - %s: io_net_rcv_tune()",
 			    str_hub->name, straddr);
 		}
@@ -701,29 +709,29 @@ str_hub_cli_attach_msg_cb(thrpt_p thrpt, void *udata) {
 	error = io_net_snd_tune(strh_cli->skt, hub_params->skt_snd_buf, 1);
 	if (0 != error) {
 		if (0 != LOG_IS_ENABLED()) {
-			ss_to_str_addr_port(&strh_cli->remonte_addr, straddr, sizeof(straddr), NULL);
+			sa_addr_port_to_str(&strh_cli->remonte_addr, straddr, sizeof(straddr), NULL);
 			LOG_ERR_FMT(error, "%s - %s: io_net_snd_tune()",
 			    str_hub->name, straddr);
 		}
 	}
-	if (0 != (STR_HUB_P_F_SKT_HALFCLOSED & hub_params->flags)) {
-		if (0 != shutdown(strh_cli->skt, SHUT_RD) &&
+	if (0 != (STR_HUB_S_F_SKT_HALFCLOSED & hub_params->flags)) {
+		if (0 != shutdown((int)strh_cli->skt, SHUT_RD) &&
 		    0 != LOG_IS_ENABLED()) {
 			error = errno;
-			ss_to_str_addr_port(&strh_cli->remonte_addr, straddr, sizeof(straddr), NULL);
+			sa_addr_port_to_str(&strh_cli->remonte_addr, straddr, sizeof(straddr), NULL);
 			LOG_ERR_FMT(error, "%s - %s: shutdown(..., SHUT_RD)",
 			    str_hub->name, straddr);
 		}
 	}
-	error = io_net_set_tcp_nodelay(strh_cli->skt, (STR_HUB_P_F_SKT_TCP_NODELAY & hub_params->flags));
+	error = io_net_set_tcp_nodelay(strh_cli->skt, (STR_HUB_S_F_SKT_TCP_NODELAY & hub_params->flags));
 	if (0 != error && 0 != LOG_IS_ENABLED()) {
-		ss_to_str_addr_port(&strh_cli->remonte_addr, straddr, sizeof(straddr), NULL);
+		sa_addr_port_to_str(&strh_cli->remonte_addr, straddr, sizeof(straddr), NULL);
 		LOG_ERR_FMT(error, "%s - %s: io_net_set_tcp_nodelay()",
 		    str_hub->name, straddr);
 	}
-	error = io_net_set_tcp_nopush(strh_cli->skt, (STR_HUB_P_F_SKT_TCP_NOPUSH & hub_params->flags));
+	error = io_net_set_tcp_nopush(strh_cli->skt, (STR_HUB_S_F_SKT_TCP_NOPUSH & hub_params->flags));
 	if (0 != error && 0 != LOG_IS_ENABLED()) {
-		ss_to_str_addr_port(&strh_cli->remonte_addr, straddr, sizeof(straddr), NULL);
+		sa_addr_port_to_str(&strh_cli->remonte_addr, straddr, sizeof(straddr), NULL);
 		LOG_ERR_FMT(error, "%s - %s: io_net_set_tcp_nopush()",
 		    str_hub->name, straddr);
 	}
@@ -731,14 +739,14 @@ str_hub_cli_attach_msg_cb(thrpt_p thrpt, void *udata) {
 		error = io_net_set_tcp_cc(strh_cli->skt, hub_params->cc_name,
 	            hub_params->cc_name_size);
 		if (0 != error && 0 != LOG_IS_ENABLED()) {
-			ss_to_str_addr_port(&strh_cli->remonte_addr, straddr, sizeof(straddr), NULL);
+			sa_addr_port_to_str(&strh_cli->remonte_addr, straddr, sizeof(straddr), NULL);
 			LOG_ERR_FMT(error, "%s - %s: io_net_set_tcp_cc()",
 			    str_hub->name, straddr);
 		}
 	}
 
 	if (0 != LOG_IS_ENABLED()) {
-		ss_to_str_addr_port(&strh_cli->remonte_addr, straddr, sizeof(straddr), NULL);
+		sa_addr_port_to_str(&strh_cli->remonte_addr, straddr, sizeof(straddr), NULL);
 		LOG_INFO_FMT("%s - %s: attached, cli_count = %zu",
 		    str_hub->name, straddr, (str_hub->cli_count + 1));
 	}
@@ -761,9 +769,10 @@ str_hub_send_to_client(str_hub_p str_hub, str_hub_cli_p strh_cli,
 	/* Get data avail for client. */
 	data2send = r_buf_data_avail_size(str_hub->r_buf, &strh_cli->rpos, &drop_size);
 	if (str_hub->shbskt->hub_params.snd_block_min_size > data2send)
-		return(0); /* Not enough data for this client. */
-	if (data2send > str_hub->shbskt->hub_params.skt_snd_buf)
+		return (0); /* Not enough data for this client. */
+	if (data2send > str_hub->shbskt->hub_params.skt_snd_buf) {
 		data2send = str_hub->shbskt->hub_params.skt_snd_buf;
+	}
 	iov_cnt = r_buf_data_get(str_hub->r_buf, &strh_cli->rpos, data2send,
 	    (iovec_p)iov, 4, &drop_size, NULL);
 	if (0 == iov_cnt) { /* Nothink to send? */
@@ -777,17 +786,20 @@ str_hub_send_to_client(str_hub_p str_hub, str_hub_cli_p strh_cli,
 		error = io_net_sendfile(str_hub->r_buf_fd, strh_cli->skt,
 		    (off_t)iov[i].iov_base, iov[i].iov_len,
 		    (IO_NET_SF_F_NODISKIO), &sbytes);
-		tr_size += sbytes;
+		tr_size += (size_t)sbytes;
 		if (0 != error)
 			break;
 	}
 	/* Supress some errors. */
-	error = NET_IO_ERR_FILTER(error);
+	error = IO_NET_ERR_FILTER(error);
 	/* Update client read pos. */
 	r_buf_rpos_inc(str_hub->r_buf, &strh_cli->rpos, tr_size);
+
 err_out:
-	if (NULL != transfered_size)
+	if (NULL != transfered_size) {
 		(*transfered_size) = tr_size;
+	}
+
 	return (error);
 }
 
@@ -804,35 +816,35 @@ str_hub_send_to_clients(str_hub_p str_hub) {
 	TAILQ_FOREACH_SAFE(strh_cli, &str_hub->cli_head, next, strh_cli_temp) {
 		transfered_size = 0;
 		/* Send HTTP headers if needed. */
-		if (0 == (STR_HUB_CLI_F_HTTP_HDRS_SENDED & strh_cli->flags)) {
-			memset(&mhdr, 0, sizeof(mhdr));
+		if (0 == (STR_HUB_CLI_STATE_F_HTTP_HDRS_SENDED & strh_cli->flags)) {
+			mem_bzero(&mhdr, sizeof(mhdr));
 			mhdr.msg_iov = (struct iovec*)iov;
 			mhdr.msg_iovlen = 3;
-			iov[0].iov_base = (uint8_t*)"HTTP/1.1 200 OK\r\n";
+			iov[0].iov_base = MK_RW_PTR("HTTP/1.1 200 OK\r\n");
 			iov[0].iov_len = 17;
-			iov[1].iov_base = (uint8_t*)str_hub->shbskt->base_http_hdrs;
+			iov[1].iov_base = str_hub->shbskt->base_http_hdrs;
 			iov[1].iov_len = str_hub->shbskt->base_http_hdrs_size;
 			iov[2].iov_base = str_hub->shbskt->hub_params.cust_http_hdrs;
 			iov[2].iov_len = str_hub->shbskt->hub_params.cust_http_hdrs_size;
-			/* Skeep allready sended data. */
-			iovec_set_offset(mhdr.msg_iov, mhdr.msg_iovlen, strh_cli->offset);
-			ios = sendmsg(strh_cli->skt, &mhdr, (MSG_DONTWAIT | MSG_NOSIGNAL));
+			/* Skip allready sended data. */
+			iovec_set_offset(mhdr.msg_iov, (size_t)mhdr.msg_iovlen, strh_cli->offset);
+			ios = sendmsg((int)strh_cli->skt, &mhdr, (MSG_DONTWAIT | MSG_NOSIGNAL));
 			if (-1 == ios) { /* Error happen. */
 				/* Supress some errors. */
-				error = NET_IO_ERR_FILTER(errno);
+				error = IO_NET_ERR_FILTER(errno);
 				goto error_on_send;
 			}
 			LOGD_EV_FMT("HTTP hdr: %zu", ios);
-			strh_cli->offset += ios;
-			if (iovec_calc_size(mhdr.msg_iov, mhdr.msg_iovlen) >
+			strh_cli->offset += (size_t)ios;
+			if (iovec_calc_size(mhdr.msg_iov, (size_t)mhdr.msg_iovlen) >
 			    (size_t)ios) /* Not all HTTP headers sended. */
 				continue; /* Try to send next headers part later. */
 			strh_cli->offset = 0;
-			strh_cli->flags |= STR_HUB_CLI_F_HTTP_HDRS_SENDED;
+			strh_cli->flags |= STR_HUB_CLI_STATE_F_HTTP_HDRS_SENDED;
 		}
 		/* Init uninitialized client rpos. */
-		if (0 == (STR_HUB_CLI_F_RPOS_INITIALIZED & strh_cli->flags)) {
-			strh_cli->flags |= STR_HUB_CLI_F_RPOS_INITIALIZED;
+		if (0 == (STR_HUB_CLI_STATE_F_RPOS_INITIALIZED & strh_cli->flags)) {
+			strh_cli->flags |= STR_HUB_CLI_STATE_F_RPOS_INITIALIZED;
 			r_buf_rpos_init(str_hub->r_buf, &strh_cli->rpos,
 			    str_hub->shbskt->hub_params.precache);
 		}
@@ -840,17 +852,18 @@ str_hub_send_to_clients(str_hub_p str_hub) {
 error_on_send:
 		if (0 != error) {
 			if (0 != LOG_IS_ENABLED()) {
-				ss_to_str_addr_port(&strh_cli->remonte_addr, straddr, sizeof(straddr), NULL);
+				sa_addr_port_to_str(&strh_cli->remonte_addr, straddr, sizeof(straddr), NULL);
 				LOG_ERR_FMT(error, "%s - %s: disconnected.",
 				    str_hub->name, straddr);
 			}
-			if (-1 != error || 0 != (STR_HUB_P_F_DROP_SLOW_CLI &
-			    str_hub->shbskt->hub_params.flags))
+			if (-1 != error ||
+			    0 != (STR_HUB_S_F_DROP_SLOW_CLI & str_hub->shbskt->hub_params.flags))
 				str_hub_cli_destroy(str_hub, strh_cli);
 			continue;
 		}
 		str_hub->sended_count += transfered_size;
 	}
+
 	return (0);
 }
 
@@ -860,7 +873,7 @@ error_on_send:
 #define P_MPGV		0x20 /* MPEG video */
 
 static int
-str_src_recv_mc_cb(io_task_p iotask, int error, int eof __unused,
+str_src_recv_mc_cb(io_task_p iotask, int error, uint32_t eof __unused,
     size_t data2transfer_size, void *arg) {
 	str_hub_p str_hub = arg;
 	uintptr_t ident;
@@ -884,12 +897,12 @@ err_out:
 	req_buf_size = STR_SRC_UDP_PKT_SIZE_STD;
 	while (transfered_size < data2transfer_size) { /* recv loop. */
 		buf_size = r_buf_wbuf_get(str_hub->r_buf, req_buf_size, &buf);
-		ios = recv(ident, buf, buf_size, MSG_DONTWAIT);
+		ios = recv((int)ident, buf, buf_size, MSG_DONTWAIT);
 		if (-1 == ios) {
 			error = errno;
 			if (0 == error)
 				error = EINVAL;
-			error = NET_IO_ERR_FILTER(error);
+			error = IO_NET_ERR_FILTER(error);
 			if (0 == error && STR_SRC_UDP_PKT_SIZE_MAX > buf_size) {
 				/* Possible not enough buf space. */
 				req_buf_size = STR_SRC_UDP_PKT_SIZE_MAX;
@@ -899,18 +912,18 @@ err_out:
 		}
 		if (0 == ios)
 			break;
-		transfered_size += ios;
-		if (MPEG2_TS_PKT_SIZE > (size_t)ios)
+		transfered_size += (size_t)ios;
+		if (MPEG2_TS_PKT_SIZE_MIN > (size_t)ios)
 			continue; /* Packet to small, drop. */
-		if (MPEG2_TS_HDR_IS_VALID((mpeg2_ts_hdr_p)buf)) { /* Test for RTP. */
+		if (MPEG2_TS_HDR_IS_VALID((mpeg2_ts_hdr_p)buf)) { /* Test_ for RTP. */
 			buf_size = (size_t)ios;
-		} else if (0 == rtp_payload_get(buf, ios, &start_off, &end_off)) {
-			/* XXX skeep payload bulk data. */
+		} else if (0 == rtp_payload_get(buf, (size_t)ios, &start_off, &end_off)) {
+			/* XXX skip payload bulk data. */
 			if (P_MPGA == ((rtp_hdr_p)buf)->pt ||
 			    P_MPGV == ((rtp_hdr_p)buf)->pt)
 				start_off += 4;
-			buf_size = (ios - (start_off + end_off));
-			if (MPEG2_TS_PKT_SIZE > buf_size)
+			buf_size = ((size_t)ios - (start_off + end_off));
+			if (MPEG2_TS_PKT_SIZE_MIN > buf_size)
 				continue; /* Packet to small, drop. */
 			/* Prevent fragmentation, zero move: buf += start_off; */
 			memmove(buf, (buf + start_off), buf_size);
@@ -951,36 +964,39 @@ str_src_r_buf_alloc(str_hub_p str_hub) {
 	/* Create buf */
 	thrpt_gettimev(str_hub->thrpt, 0, &tv_now);
 	md5_get_digest_strA((char*)&tv_now, sizeof(tv_now), (char*)hash);
-	snprintf(filename, (sizeof(filename) - 1), "/tmp/msd-%zu-%s.tmp",
+	snprintf(filename, sizeof(filename), "/tmp/msd-%zu-%s.tmp",
 	    (size_t)getpid(), hash);
-	str_hub->r_buf_fd = open(filename, (O_CREAT | O_EXCL | O_RDWR), 0600);
+	str_hub->r_buf_fd = (uintptr_t)open(filename, (O_CREAT | O_EXCL | O_RDWR), 0600);
 	if ((uintptr_t)-1 == str_hub->r_buf_fd) {
 		error = errno;
 		LOG_ERR_FMT(error, "open(): %s", filename);
 		goto err_out;
 	}
-	if (0 != flock(str_hub->r_buf_fd, LOCK_EX))
+	if (0 != flock((int)str_hub->r_buf_fd, LOCK_EX)) {
 		LOG_ERR_FMT(errno, "flock(): %s", filename);
+	}
+
 	/* Truncate it to the correct size */
-	if (0 != ftruncate(str_hub->r_buf_fd, str_hub->shbskt->hub_params.ring_buf_size)) {
+	if (0 != ftruncate((int)str_hub->r_buf_fd, (off_t)str_hub->shbskt->hub_params.ring_buf_size)) {
 		error = errno;
 		LOG_ERR_FMT(error, "ftruncate(): %s", filename);
 		goto err_out;
 	}
 	str_hub->r_buf = r_buf_alloc(str_hub->r_buf_fd, str_hub->shbskt->hub_params.ring_buf_size,
-	    1024/*MPEG2_TS_PKT_SIZE*/);
+	    1024/*MPEG2_TS_PKT_SIZE_188*/);
 	if (NULL == str_hub->r_buf) {
 		error = errno;
-		LOGD_ERR(error, "mmalloc_fd()");
+		LOGD_ERR(error, "r_buf_alloc()");
 		goto err_out;
 	}
 	unlink(filename);
 	
 	return (0);
+
 err_out:
 	/* Error. */
-	flock(str_hub->r_buf_fd, LOCK_UN);
-	close(str_hub->r_buf_fd);
+	flock((int)str_hub->r_buf_fd, LOCK_UN);
+	close((int)str_hub->r_buf_fd);
 	unlink(filename);
 	LOG_ERR(error, "...");
 	return (error);
@@ -991,8 +1007,8 @@ str_src_r_buf_free(str_hub_p str_hub) {
 
 	if (NULL == str_hub)
 		return;
-	flock(str_hub->r_buf_fd, LOCK_UN);
-	close(str_hub->r_buf_fd);
+	flock((int)str_hub->r_buf_fd, LOCK_UN);
+	close((int)str_hub->r_buf_fd);
 	str_hub->r_buf_fd = (uintptr_t)-1;
 	r_buf_free(str_hub->r_buf);
 	str_hub->r_buf = NULL;

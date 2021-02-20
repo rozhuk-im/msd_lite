@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012 - 2014 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2012 - 2015 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -57,8 +57,8 @@ typedef struct r_buf_s { /* Ring buf. */
 	uint32_t	flags;		/* Flags. */
 } r_buf_t, *r_buf_p;
 
-#define RBUF_F_FRAG	(1 << 0) /* Fragmented. */
-#define RBUF_F_FULL	(1 << 1) /* Buffer is full: to detect round_num == 0 but data avaible. */
+#define RBUF_F_FRAG	(((uint32_t)1) << 0) /* Fragmented. */
+#define RBUF_F_FULL	(((uint32_t)1) << 1) /* Buffer is full: to detect round_num == 0 but data avaible. */
 
 
 
@@ -69,25 +69,35 @@ typedef struct r_buf_rpos_s { /* Ring buf read pos. */
 } r_buf_rpos_t, *r_buf_rpos_p;
 
 
-int		r_buf_rpos_init(r_buf_p r_buf, r_buf_rpos_p rpos, size_t data_size);
+/*  0: rpos1 == rpos2
+ *  1: rpos1 > rpos2
+ * -1: rpos1 < rpos2
+ */
+int	r_buf_rpos_cmp(r_buf_rpos_p rpos1, r_buf_rpos_p rpos2);
+size_t	r_buf_rpos_calc_size(r_buf_p r_buf, r_buf_rpos_p rpos1, r_buf_rpos_p rpos2);
+int	r_buf_rpos_init(r_buf_p r_buf, r_buf_rpos_p rpos,
+	    size_t data_size);
+int	r_buf_rpos_init_near(r_buf_p r_buf, r_buf_rpos_p rpos,
+	    size_t data_size, r_buf_rpos_p rposs, size_t rposs_cnt);
+int	r_buf_rpos_check_fast(r_buf_p r_buf, r_buf_rpos_p rpos);
 
-r_buf_p		r_buf_alloc(uintptr_t fd, size_t size, size_t min_block_size);
-void		r_buf_free(r_buf_p r_buf);
+r_buf_p	r_buf_alloc(uintptr_t fd, size_t size, size_t min_block_size);
+void	r_buf_free(r_buf_p r_buf);
 
-size_t		r_buf_wbuf_get(r_buf_p r_buf, size_t min_buf_size, uint8_t **buf);
-int		r_buf_wbuf_set(r_buf_p r_buf, size_t offset, size_t buf_size);
-int		r_buf_wbuf_set2(r_buf_p r_buf, uint8_t *buf, size_t buf_size,
-		    size_t *iov_index);
-int		r_buf_wbuf_set_ex(r_buf_p r_buf, iovec_p iov, size_t iov_cnt);
+size_t	r_buf_wbuf_get(r_buf_p r_buf, size_t min_buf_size, uint8_t **buf);
+int	r_buf_wbuf_set(r_buf_p r_buf, size_t offset, size_t buf_size);
+int	r_buf_wbuf_set2(r_buf_p r_buf, uint8_t *buf, size_t buf_size,
+	    r_buf_rpos_p rpos);
+int	r_buf_wbuf_set_ex(r_buf_p r_buf, iovec_p iov, size_t iov_cnt);
 
-size_t		r_buf_data_avail_size(r_buf_p r_buf, r_buf_rpos_p rpos,
-		    size_t *drop_size);
-size_t		r_buf_data_get(r_buf_p r_buf, r_buf_rpos_p rpos, size_t data_size,
-		    iovec_p iov, size_t iov_cnt,
-		    size_t *drop_size, size_t *data_size_ret);
+size_t	r_buf_data_avail_size(r_buf_p r_buf, r_buf_rpos_p rpos,
+	    size_t *drop_size);
+size_t	r_buf_data_get(r_buf_p r_buf, r_buf_rpos_p rpos, size_t data_size,
+	    iovec_p iov, size_t iov_cnt,
+	    size_t *drop_size, size_t *data_size_ret);
 /* sendfile() needs offset. */
-int		r_buf_data_get_conv2off(r_buf_p r_buf, iovec_p iov, size_t iov_cnt);
-void		r_buf_rpos_inc(r_buf_p r_buf, r_buf_rpos_p rpos, size_t data_size);
+int	r_buf_data_get_conv2off(r_buf_p r_buf, iovec_p iov, size_t iov_cnt);
+void	r_buf_rpos_inc(r_buf_p r_buf, r_buf_rpos_p rpos, size_t data_size);
 
 
 

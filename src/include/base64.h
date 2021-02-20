@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003 - 2014 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2003 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,18 +26,18 @@
  */
 
 
-#ifndef AFX_BASE64__H__INCLUDED_
-#define AFX_BASE64__H__INCLUDED_
+#ifndef __BASE64_H__
+#define __BASE64_H__
 
 
 #ifndef _WINDOWS
-#include <sys/types.h>
-#include <inttypes.h>
+#	include <sys/types.h>
+#	include <inttypes.h>
 #else
-#define EINVAL		ERROR_INVALID_HANDLE
-#define ENOBUFS		ERROR_BUFFER_OVERFLOW
-#define uint8_t		unsigned char
-#define size_t		SIZE_T
+#	define EINVAL		ERROR_INVALID_HANDLE
+#	define ENOBUFS		ERROR_BUFFER_OVERFLOW
+#	define uint8_t		unsigned char
+#	define size_t		SIZE_T
 #endif
 
 /*
@@ -115,7 +115,7 @@ base64_encode(uint8_t *src, size_t src_size, uint8_t *dst, size_t dst_size, size
 	}
 	(*wpos) = 0;
 #if 0
-	if (tm != (wpos - dst)) { /* Must be euqual! */
+	if ((wpos - dst) != tm) { /* Must be euqual! */
 		(*enc_size) = (wpos - dst);
 	}
 #endif
@@ -132,7 +132,7 @@ base64_decode(uint8_t *src, size_t src_size, uint8_t *dst, size_t dst_size, size
 		return (EINVAL);
 	/* Remove tail padding. */
 	for (; 0 < src_size; src_size --) {
-		if (src[(src_size - 1)] != '=')
+		if ('=' != src[(src_size - 1)])
 			break;
 	}
 	if (2 > src_size) /* Check again: at least 2 byte needed for decoder. */
@@ -208,4 +208,4 @@ base64_decode_fmt(uint8_t *src, size_t src_size, uint8_t *dst, size_t dst_size, 
 
 
 
-#endif // !defined(AFX_BASE64__H__INCLUDED_)
+#endif // __BASE64_H__

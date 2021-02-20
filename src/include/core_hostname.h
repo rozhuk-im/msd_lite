@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2013 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2013 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,14 +31,14 @@
 #ifndef __CORE_HOSTNAME_H__
 #define __CORE_HOSTNAME_H__
 
-#include "buf_case.h"
+#include "mem_helpers.h"
 
 #define HOSTNAME_PREALLOC	8
 
 
 typedef struct hostname_s {
 	size_t		size;	/* Host name size. */
-	uint8_t		*name;	/* Hostname. */
+	uint8_t		name[];	/* Hostname. */
 } hostname_t, *hostname_p;
 
 typedef struct hostname_list_s {
@@ -56,8 +56,8 @@ hostname_list_init(hostname_list_p hn_lst) {
 
 	if (NULL == hn_lst)
 		return (EINVAL);
-	memset(hn_lst, 0, sizeof(hostname_list_t));
-	/*hn_lst->names = malloc((HOSTNAME_PREALLOC * sizeof(hostname_p)));
+	mem_bzero(hn_lst, sizeof(hostname_list_t));
+	/*hn_lst->names = mallocarray(HOSTNAME_PREALLOC, sizeof(hostname_p));
 	if (NULL == hn_lst->names)
 		return (ENOMEM);
 	hn_lst->allocated = HOSTNAME_PREALLOC;
@@ -78,9 +78,11 @@ hostname_list_deinit(hostname_list_p hn_lst) {
 			free(hn_lst->names[i]);
 		}
 		free(hn_lst->names);
+		hn_lst->names = NULL;
 		hn_lst->allocated = 0;
 	}
 }
+
 
 static inline hostname_list_p
 hostname_list_alloc() {
@@ -96,6 +98,39 @@ hostname_list_alloc() {
 	return (hn_lst);
 }
 
+static inline hostname_list_p
+hostname_list_clone(hostname_list_p hn_lst) {
+	size_t i, size;
+	hostname_list_p hn_new;
+
+	hn_new = malloc(sizeof(hostname_list_t));
+	if (NULL == hn_new)
+		return (hn_new);
+	memcpy(hn_new, hn_lst, sizeof(hostname_list_t));
+	hn_new->names = zallocarray(hn_new->allocated, sizeof(hostname_p));
+	if (NULL == hn_new->names) {
+		free(hn_new);
+		return (NULL);
+	}
+
+	for (i = 0; i <	hn_lst->count; i ++) {
+		if (NULL == hn_lst->names[i])
+			continue;
+		size = hn_lst->names[i]->size;
+		hn_new->names[i] = malloc((sizeof(hostname_t) + size + sizeof(void*)));
+		if (NULL == hn_new->names[i]) {
+			free(hn_new->names); // XXX mem leak?
+			free(hn_new);
+			return (NULL);
+		}
+		memcpy(hn_new->names[i]->name, hn_lst->names[i]->name, size);
+		hn_new->names[i]->name[size] = 0;
+		hn_new->names[i]->size = size;
+	}
+
+	return (hn_new);
+}
+
 static inline void
 hostname_list_free(hostname_list_p hn_lst) {
 
@@ -104,6 +139,7 @@ hostname_list_free(hostname_list_p hn_lst) {
 	hostname_list_deinit(hn_lst);
 	free(hn_lst);
 }
+
 
 static inline int
 hostname_list_check_any(hostname_list_p hn_lst) {
@@ -116,75 +152,75 @@ hostname_list_check_any(hostname_list_p hn_lst) {
 }
 
 static inline int
-hostname_list_check(hostname_list_p hn_lst, uint8_t *name, size_t size) {
+hostname_list_check(hostname_list_p hn_lst, const uint8_t *name, size_t size) {
 	size_t i;
 
 	if (NULL == hn_lst || NULL == name || 0 == size)
 		return (EINVAL);
-
-	if (0 != hn_lst->any_name)
+	/* Is any? */
+	if (0 == hostname_list_check_any(hn_lst))
 		return (0);
+	/* Check normal names. */
 	if (NULL == hn_lst->names || 0 == hn_lst->count)
 		return (ENOENT);
 	for (i = 0; i <	hn_lst->count; i ++) {
 		if (NULL == hn_lst->names[i])
 			continue;
-		if (0 == buf_cmpi(hn_lst->names[i]->name, hn_lst->names[i]->size,
+		if (0 == mem_cmpin(hn_lst->names[i]->name, hn_lst->names[i]->size,
 		    name, size))
 			return (0);
 	}
+
 	return (ENOENT);
 }
 
 static inline int
-hostname_list_find(hostname_list_p hn_lst, uint8_t *name, size_t size) {
+hostname_list_find(hostname_list_p hn_lst, const uint8_t *name, size_t size) {
 	size_t i;
 
 	if (NULL == hn_lst || NULL == name || 0 == size)
 		return (EINVAL);
-
 	if (NULL == hn_lst->names || 0 == hn_lst->count)
 		return (ENOENT);
 	for (i = 0; i <	hn_lst->count; i ++) {
 		if (NULL == hn_lst->names[i])
 			continue;
-		if (0 != buf_cmpi(hn_lst->names[i]->name, hn_lst->names[i]->size,
+		if (0 != mem_cmpin(hn_lst->names[i]->name, hn_lst->names[i]->size,
 		    name, size))
 			continue;
 		return (0);
 	}
+
 	return (ENOENT);
 }
 
 static inline int
-hostname_list_add(hostname_list_p hn_lst, uint8_t *name, size_t size) {
-	hostname_p *names_new;
+hostname_list_add(hostname_list_p hn_lst, const uint8_t *name, size_t size) {
+	int error;
 
 	if (NULL == hn_lst || NULL == name || 0 == size)
 		return (EINVAL);
+	/* Is any? */
 	if (1 == size && '*' == (*name)) {
 		hn_lst->any_name = 1;
 		return (0);
 	}
-	if (0 == hostname_list_find(hn_lst, name, size)) /* Prevent duplicates. */
+	/* Check for duplicates. */
+	if (0 == hostname_list_find(hn_lst, name, size))
 		return (0);
 	/* Add new item. */
-	if (hn_lst->allocated == hn_lst->count) { /* realloc pointers. */
-		hn_lst->allocated += HOSTNAME_PREALLOC;
-		names_new = realloc(hn_lst->names, (sizeof(hostname_p) *
-		    hn_lst->allocated));
-		if (NULL == names_new) /* Realloc fail! */
-			return (ENOMEM);
-		hn_lst->names = names_new;
-	}
-	hn_lst->names[hn_lst->count] = malloc((sizeof(hostname_t) + size + 4));
+	error = realloc_items((void**)&hn_lst->names, sizeof(hostname_p),
+	    &hn_lst->allocated, HOSTNAME_PREALLOC, hn_lst->count);
+	if (0 != error) /* Realloc fail! */
+		return (error);
+	hn_lst->names[hn_lst->count] = malloc((sizeof(hostname_t) + size + sizeof(void*)));
 	if (NULL == hn_lst->names[hn_lst->count])
 		return (ENOMEM);
-	hn_lst->names[hn_lst->count]->name = (uint8_t*)(hn_lst->names[hn_lst->count] + 1);
 	memcpy(hn_lst->names[hn_lst->count]->name, name, size);
 	hn_lst->names[hn_lst->count]->name[size] = 0;
 	hn_lst->names[hn_lst->count]->size = size;
 	hn_lst->count ++;
+
 	return (0);
 }
 

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2007 - 2014 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2007 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,35 +40,47 @@
 
 
 
-int	xml_decode(uint8_t *encoded, size_t encoded_size, uint8_t *xml, size_t xml_buf_size,
-	    size_t *xml_size);
-int	xml_encode(uint8_t *xml, size_t xml_size, uint8_t *encoded, size_t encoded_buf_size,
-	    size_t *encoded_size);
+int	xml_decode(const uint8_t *encoded, size_t encoded_size,
+	    uint8_t *xml, size_t xml_buf_size, size_t *xml_size);
+int	xml_encode(const uint8_t *xml, size_t xml_size, uint8_t *encoded,
+	    size_t encoded_buf_size, size_t *encoded_size);
 
-int	xml_get_val_arr(uint8_t *xml_data, size_t xml_data_size, uint8_t **next_pos,
+int	xml_get_val_arr(const uint8_t *xml_data, size_t xml_data_size,
+	    const uint8_t **next_pos,
 	    size_t tag_arr_count, const uint8_t **tag_arr, size_t *tag_arr_cnt,
-	    uint8_t **ret_attr, size_t *ret_attr_size,
-	    uint8_t **ret_value, size_t *ret_value_size);
-int	xml_get_val_args(uint8_t *xml_data, size_t xml_data_size, uint8_t **next_pos,
-	    uint8_t **ret_attr, size_t *ret_attr_size,
-	    uint8_t **ret_value, size_t *ret_value_size,
+	    const uint8_t **ret_attr, size_t *ret_attr_size,
+	    const uint8_t **ret_value, size_t *ret_value_size);
+int	xml_get_val_args(const uint8_t *xml_data, size_t xml_data_size,
+	    const uint8_t **next_pos,
+	    const uint8_t **ret_attr, size_t *ret_attr_size,
+	    const uint8_t **ret_value, size_t *ret_value_size,
 	    const uint8_t *tag1, ...);
-int	xml_get_val_ssize_t_args(uint8_t *xml_data, size_t xml_data_size,
-	    uint8_t **next_pos, ssize_t *val_ret, const uint8_t *tag1, ...);
-int	xml_get_val_int_args(uint8_t *xml_data, size_t xml_data_size, uint8_t **next_pos,
-	    int32_t *val_ret, const uint8_t *tag1, ...);
-size_t	xml_calc_tag_count_args(uint8_t *xml_data, size_t xml_data_size,
+int	xml_get_val_size_t_args(const uint8_t *xml_data, size_t xml_data_size,
+	    const uint8_t **next_pos, size_t *val_ret, const uint8_t *tag1, ...);
+int	xml_get_val_ssize_t_args(const uint8_t *xml_data, size_t xml_data_size,
+	    const uint8_t **next_pos, ssize_t *val_ret, const uint8_t *tag1, ...);
+int	xml_get_val_uint32_args(const uint8_t *xml_data, size_t xml_data_size,
+	    const uint8_t **next_pos, uint32_t *val_ret, const uint8_t *tag1, ...);
+int	xml_get_val_int32_args(const uint8_t *xml_data, size_t xml_data_size,
+	    const uint8_t **next_pos, int32_t *val_ret, const uint8_t *tag1, ...);
+int	xml_get_val_uint64_args(const uint8_t *xml_data, size_t xml_data_size,
+	    const uint8_t **next_pos, uint64_t *val_ret, const uint8_t *tag1, ...);
+int	xml_get_val_int64_args(const uint8_t *xml_data, size_t xml_data_size,
+	    const uint8_t **next_pos, int64_t *val_ret, const uint8_t *tag1, ...);
+size_t	xml_calc_tag_count_args(const uint8_t *xml_data, size_t xml_data_size,
 	    const uint8_t *tag1, ...);
 
-int	xml_get_val_ns_arr(uint8_t *xml_data, size_t xml_data_size, uint8_t **next_pos,
+int	xml_get_val_ns_arr(const uint8_t *xml_data, size_t xml_data_size,
+	    const uint8_t **next_pos,
 	    size_t tag_arr_count, const uint8_t **tag_arr, size_t *tag_arr_cnt,
-	    uint8_t **ret_ns, size_t *ret_ns_size,
-	    uint8_t **ret_attr, size_t *ret_attr_size,
-	    uint8_t **ret_value, size_t *ret_value_size);
-int	xml_get_val_ns_args(uint8_t *xml_data, size_t xml_data_size, uint8_t **next_pos,
-	    uint8_t **ret_ns, size_t *ret_ns_size,
-	    uint8_t **ret_attr, size_t *ret_attr_size,
-	    uint8_t **ret_value, size_t *ret_value_size,
+	    const uint8_t **ret_ns, size_t *ret_ns_size,
+	    const uint8_t **ret_attr, size_t *ret_attr_size,
+	    const uint8_t **ret_value, size_t *ret_value_size);
+int	xml_get_val_ns_args(const uint8_t *xml_data, size_t xml_data_size,
+	    const uint8_t **next_pos,
+	    const uint8_t **ret_ns, size_t *ret_ns_size,
+	    const uint8_t **ret_attr, size_t *ret_attr_size,
+	    const uint8_t **ret_value, size_t *ret_value_size,
 	    const uint8_t *tag1, ...);
 
 

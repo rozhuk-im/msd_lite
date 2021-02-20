@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 - 2014 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2013 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,28 +31,29 @@
 // RFC 4634, RFC6234 - SHA2
 // RFC 2104 - HMAC
 
-#ifndef SHA2_H__INCLUDED_
-#define SHA2_H__INCLUDED_
-
-#if _MSC_VER > 1000
-#	pragma once
-#endif // _MSC_VER > 1000
-
+#ifndef __SHA2_H__INCLUDED__
+#define __SHA2_H__INCLUDED__
 
 #ifndef _WINDOWS
 #	include <sys/param.h>
-#	ifndef BSD
+#	ifdef __linux__ /* Linux specific code. */
 #		define _GNU_SOURCE /* See feature_test_macros(7) */
 #		define __USE_GNU 1
-#	endif
+#		include <endian.h>
+#	else
+#		include <sys/endian.h>
+#	endif /* Linux specific code. */
 #	include <sys/types.h>
 #	include <string.h> /* bcopy, bzero, memcpy, memmove, memset, strerror... */
 #	include <inttypes.h>
+	static void *(*volatile sha2_memset_volatile)(void*, int, size_t) = memset;
+#	define sha2_bzero(__mem, __size)	sha2_memset_volatile((__mem), 0x00, (__size))
 #else
 #	define uint8_t		unsigned char
 #	define uint32_t		DWORD
 #	define uint64_t		DWORDLONG
 #	define size_t		SIZE_T
+#	define sha2_bzero(__mem, __size)	SecureZeroMemory((__mem), (__size))
 #endif
 
 #if defined(_WINDOWS) && defined(UNICODE)
@@ -66,18 +67,7 @@
 #endif
 
 
-#ifndef SHA2_MAX_SPEED /* Max speed is insecure mode! */
-#	ifdef SecureZeroMemory /* Windows version. */
-#		define sha2_bzero(mem, size)	SecureZeroMemory(mem, size)
-#	else
-		static void *(*volatile sha2_memset_volatile)(void *, int, size_t) = memset;
-#		define sha2_bzero(mem, size)	sha2_memset_volatile(mem, 0, size)
-#	endif
-#else
-#	define sha2_bzero(mem, size)
-#endif
-
-
+/* HASH constants. */
 #define SHA2_224_HASH_SIZE	28
 #define SHA2_256_HASH_SIZE	32
 #define SHA2_384_HASH_SIZE	48
@@ -90,12 +80,12 @@
 #define SHA2_512_HASH_STR_SIZE	(SHA2_512_HASH_SIZE * 2)
 #define SHA2_HASH_STR_MAX_SIZE	SHA2_512_HASH_STR_SIZE
 
-#define SHA2_224_MSG_BLK_SIZE	64
 #define SHA2_256_MSG_BLK_SIZE	64
-#define SHA2_384_MSG_BLK_SIZE	128
 #define SHA2_512_MSG_BLK_SIZE	128
 #define SHA2_MSG_BLK_MAX_SIZE	SHA2_512_MSG_BLK_SIZE
-
+#define SHA2_256_MSG_BLK_64CNT	(SHA2_256_MSG_BLK_SIZE / sizeof(uint64_t)) /* 8 */
+#define SHA2_512_MSG_BLK_64CNT	(SHA2_512_MSG_BLK_SIZE / sizeof(uint64_t)) /* 16 */
+#define SHA2_MSG_BLK_MAX_64CNT	(SHA2_MSG_BLK_MAX_SIZE / sizeof(uint64_t)) /* 16 */
 
 
 /* Define the SHA shift, rotate left and rotate right macro */
@@ -105,22 +95,22 @@
 #define SHA2_ROTR64(bits, word)	((((uint64_t)(word)) >> (bits)) | (((uint64_t)(word)) << (64 - (bits))))
 
 /* Define the SHA SIGMA and sigma macros */
-#define SHA2_32_SIGMA0(word)	\
+#define SHA2_32_SIGMA0(word)						\
 	(SHA2_ROTR32(2, word) ^ SHA2_ROTR32(13, word) ^ SHA2_ROTR32(22, word))
-#define SHA2_32_SIGMA1(word)	\
+#define SHA2_32_SIGMA1(word)						\
 	(SHA2_ROTR32(6, word) ^ SHA2_ROTR32(11, word) ^ SHA2_ROTR32(25, word))
-#define SHA2_32_sigma0(word)	\
+#define SHA2_32_sigma0(word)						\
 	(SHA2_ROTR32(7, word) ^ SHA2_ROTR32(18, word) ^ SHA2_SHR32(3, word))
-#define SHA2_32_sigma1(word)	\
+#define SHA2_32_sigma1(word)						\
 	(SHA2_ROTR32(17, word) ^ SHA2_ROTR32(19, word) ^ SHA2_SHR32(10, word))
 
-#define SHA2_64_SIGMA0(word)	\
+#define SHA2_64_SIGMA0(word)						\
 	(SHA2_ROTR64(28, word) ^ SHA2_ROTR64(34, word) ^ SHA2_ROTR64(39, word))
-#define SHA2_64_SIGMA1(word)	\
+#define SHA2_64_SIGMA1(word)						\
 	(SHA2_ROTR64(14, word) ^ SHA2_ROTR64(18, word) ^ SHA2_ROTR64(41, word))
-#define SHA2_64_sigma0(word)	\
+#define SHA2_64_sigma0(word)						\
 	(SHA2_ROTR64(1, word) ^ SHA2_ROTR64(8, word) ^ SHA2_SHR64(7, word))
-#define SHA2_64_sigma1(word)	\
+#define SHA2_64_sigma1(word)						\
 	(SHA2_ROTR64(19, word) ^ SHA2_ROTR64(61, word) ^ SHA2_SHR64(6, word))
 
 #define SHA2_Ch(x, y, z)	(((x) & (y)) | ((~(x)) & (z)))
@@ -145,14 +135,14 @@ static const uint32_t SHA2_256_H0[(SHA2_256_HASH_SIZE / sizeof(uint32_t))] = {
 };
 /* Initial Hash Values: FIPS-180-2 sections 5.3.3 and 5.3.4 */
 static const uint64_t SHA2_384_H0[(SHA2_512_HASH_SIZE / sizeof(uint64_t))] = {
-	0xcbbb9d5dc1059ed8ll, 0x629a292a367cd507ll, 0x9159015a3070dd17ll,
-	0x152fecd8f70e5939ll, 0x67332667ffc00b31ll, 0x8eb44a8768581511ll,
-	0xdb0c2e0d64f98fa7ll, 0x47b5481dbefa4fa4ll
+	0xcbbb9d5dc1059ed8ull, 0x629a292a367cd507ull, 0x9159015a3070dd17ull,
+	0x152fecd8f70e5939ull, 0x67332667ffc00b31ull, 0x8eb44a8768581511ull,
+	0xdb0c2e0d64f98fa7ull, 0x47b5481dbefa4fa4ull
 };
 static const uint64_t SHA2_512_H0[(SHA2_512_HASH_SIZE / sizeof(uint64_t))] = {
-	0x6a09e667f3bcc908ll, 0xbb67ae8584caa73bll, 0x3c6ef372fe94f82bll,
-	0xa54ff53a5f1d36f1ll, 0x510e527fade682d1ll, 0x9b05688c2b3e6c1fll,
-	0x1f83d9abfb41bd6bll, 0x5be0cd19137e2179ll
+	0x6a09e667f3bcc908ull, 0xbb67ae8584caa73bull, 0x3c6ef372fe94f82bull,
+	0xa54ff53a5f1d36f1ull, 0x510e527fade682d1ull, 0x9b05688c2b3e6c1full,
+	0x1f83d9abfb41bd6bull, 0x5be0cd19137e2179ull
 };
 
 
@@ -161,23 +151,24 @@ typedef struct sha2_ctx_s {
 	uint64_t hash[(SHA2_HASH_MAX_SIZE / sizeof(uint64_t))]; /* Message Digest. */
 	uint64_t count;		/* Number of bits, modulo 2^64 (lsb first). */
 	uint64_t count_hi;	/* Number of bits high. */
-	uint32_t hash_size;	/* hash size of SHA being used */
-	uint32_t block_size;	/* block size of SHA being used */
-	uint8_t buffer[SHA2_MSG_BLK_MAX_SIZE]; /* Input buffer: message blocks. */
+	size_t hash_size;	/* hash size of SHA being used */
+	size_t block_size;	/* block size of SHA being used */
+	uint64_t buffer[SHA2_MSG_BLK_MAX_64CNT]; /* Input buffer: message blocks. */
 	uint64_t W[80];		/* Temp buf for sha2_transform(). */
 } sha2_ctx_t, *sha2_ctx_p;
 
 typedef struct hmac_sha2_ctx_s {
 	sha2_ctx_t ctx;
-	uint64_t k_opad[(SHA2_MSG_BLK_MAX_SIZE / sizeof(uint64_t))]; /* outer padding - key XORd with opad. */
+	uint64_t k_opad[SHA2_MSG_BLK_MAX_64CNT]; /* outer padding - key XORd with opad. */
 } hmac_sha2_ctx_t, *hmac_sha2_ctx_p;
 
 
 
 static inline void
-sha2_memcpy_bswap4(uint8_t *dst, uint8_t *src, size_t size) {
+sha2_memcpy_bswap4(uint8_t *dst, const uint8_t *src, const size_t size) {
 	register size_t i;
 
+#pragma unroll
 	//for (i = 0; i < size; i ++)
 	//	dst[i] = src[((i & ~3) + (3 - (i & 0x03)))]; /* bswap()/htonl() */
 	for (i = 0; i < size; i += 4) {
@@ -189,9 +180,10 @@ sha2_memcpy_bswap4(uint8_t *dst, uint8_t *src, size_t size) {
 }
 
 static inline void
-sha2_memcpy_bswap8(uint8_t *dst, uint8_t *src, size_t size) {
+sha2_memcpy_bswap8(uint8_t *dst, const uint8_t *src, const size_t size) {
 	register size_t i;
 
+#pragma unroll
 	//for (i = 0; i < size; i ++)
 	//	dst[i] = src[((i & ~7) + (7 - (i & 0x07)))]; /* bswap()/htonl() */
 	for (i = 0; i < size; i += 8) {
@@ -214,14 +206,14 @@ sha2_memcpy_bswap8(uint8_t *dst, uint8_t *src, size_t size) {
  *      for computing a new SHA2 message digest.
  */
 static inline void
-sha2_init(int bits, sha2_ctx_p ctx) {
+sha2_init(const size_t bits, sha2_ctx_p ctx) {
 	
 	/* Load magic initialization constants. */
 	switch (bits) {
 	case 224:
 	case SHA2_224_HASH_SIZE:
 		ctx->hash_size = SHA2_224_HASH_SIZE;
-		ctx->block_size = SHA2_224_MSG_BLK_SIZE;
+		ctx->block_size = SHA2_256_MSG_BLK_SIZE;
 		memcpy(&ctx->hash, SHA2_224_H0, sizeof(SHA2_224_H0));
 		break;
 	case 256:
@@ -233,7 +225,7 @@ sha2_init(int bits, sha2_ctx_p ctx) {
 	case 384:
 	case SHA2_384_HASH_SIZE:
 		ctx->hash_size = SHA2_384_HASH_SIZE;
-		ctx->block_size = SHA2_384_MSG_BLK_SIZE;
+		ctx->block_size = SHA2_512_MSG_BLK_SIZE;
 		memcpy(&ctx->hash, SHA2_384_H0, sizeof(SHA2_384_H0));
 		break;
 	case 512:
@@ -255,8 +247,8 @@ sha2_init(int bits, sha2_ctx_p ctx) {
  *   stored in the Message_Block array.
  */
 static inline void
-sha2_transform_block64(sha2_ctx_p ctx, uint8_t *block) {
-	const uint32_t K[64] = { /* Constants defined in FIPS-180-2, section 4.2.2 */
+sha2_transform_block64(sha2_ctx_p ctx, const uint8_t *block) {
+	static const uint32_t K[64] = { /* Constants defined in FIPS-180-2, section 4.2.2 */
 		0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b,
 		0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01,
 		0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7,
@@ -289,10 +281,13 @@ sha2_transform_block64(sha2_ctx_p ctx, uint8_t *block) {
 	/* Initialize the first 16 words in the array W. */
 	sha2_memcpy_bswap4((uint8_t*)W, block, SHA2_256_MSG_BLK_SIZE);
 
-	for (t = 16; t < 64; t ++)
+#pragma unroll
+	for (t = 16; t < 64; t ++) {
 		W[t] = (SHA2_32_sigma1(W[(t - 2)]) + W[(t - 7)] +
 			SHA2_32_sigma0(W[(t - 15)]) + W[(t - 16)]);
-	
+	}
+
+#pragma unroll
 	for (t = 0; t < 64; t ++) {
 		temp1 = H + SHA2_32_SIGMA1(E) + SHA2_Ch(E, F, G) + K[t] + W[t];
 		temp2 = SHA2_32_SIGMA0(A) + SHA2_Maj(A, B, C);
@@ -323,36 +318,36 @@ sha2_transform_block64(sha2_ctx_p ctx, uint8_t *block) {
  *   message stored in the Message_Block array.
  */
 static inline void
-sha2_transform_block128(sha2_ctx_p ctx, uint8_t *block) {
+sha2_transform_block128(sha2_ctx_p ctx, const uint8_t *block) {
 	/* Constants defined in FIPS-180-2, section 4.2.3 */
-	const uint64_t K[80] = {
-		0x428a2f98d728ae22ll, 0x7137449123ef65cdll, 0xb5c0fbcfec4d3b2fll,
-		0xe9b5dba58189dbbcll, 0x3956c25bf348b538ll, 0x59f111f1b605d019ll,
-		0x923f82a4af194f9bll, 0xab1c5ed5da6d8118ll, 0xd807aa98a3030242ll,
-		0x12835b0145706fbell, 0x243185be4ee4b28cll, 0x550c7dc3d5ffb4e2ll,
-		0x72be5d74f27b896fll, 0x80deb1fe3b1696b1ll, 0x9bdc06a725c71235ll,
-		0xc19bf174cf692694ll, 0xe49b69c19ef14ad2ll, 0xefbe4786384f25e3ll,
-		0x0fc19dc68b8cd5b5ll, 0x240ca1cc77ac9c65ll, 0x2de92c6f592b0275ll,
-		0x4a7484aa6ea6e483ll, 0x5cb0a9dcbd41fbd4ll, 0x76f988da831153b5ll,
-		0x983e5152ee66dfabll, 0xa831c66d2db43210ll, 0xb00327c898fb213fll,
-		0xbf597fc7beef0ee4ll, 0xc6e00bf33da88fc2ll, 0xd5a79147930aa725ll,
-		0x06ca6351e003826fll, 0x142929670a0e6e70ll, 0x27b70a8546d22ffcll,
-		0x2e1b21385c26c926ll, 0x4d2c6dfc5ac42aedll, 0x53380d139d95b3dfll,
-		0x650a73548baf63dell, 0x766a0abb3c77b2a8ll, 0x81c2c92e47edaee6ll,
-		0x92722c851482353bll, 0xa2bfe8a14cf10364ll, 0xa81a664bbc423001ll,
-		0xc24b8b70d0f89791ll, 0xc76c51a30654be30ll, 0xd192e819d6ef5218ll,
-		0xd69906245565a910ll, 0xf40e35855771202all, 0x106aa07032bbd1b8ll,
-		0x19a4c116b8d2d0c8ll, 0x1e376c085141ab53ll, 0x2748774cdf8eeb99ll,
-		0x34b0bcb5e19b48a8ll, 0x391c0cb3c5c95a63ll, 0x4ed8aa4ae3418acbll,
-		0x5b9cca4f7763e373ll, 0x682e6ff3d6b2b8a3ll, 0x748f82ee5defb2fcll,
-		0x78a5636f43172f60ll, 0x84c87814a1f0ab72ll, 0x8cc702081a6439ecll,
-		0x90befffa23631e28ll, 0xa4506cebde82bde9ll, 0xbef9a3f7b2c67915ll,
-		0xc67178f2e372532bll, 0xca273eceea26619cll, 0xd186b8c721c0c207ll,
-		0xeada7dd6cde0eb1ell, 0xf57d4f7fee6ed178ll, 0x06f067aa72176fball,
-		0x0a637dc5a2c898a6ll, 0x113f9804bef90daell, 0x1b710b35131c471bll,
-		0x28db77f523047d84ll, 0x32caab7b40c72493ll, 0x3c9ebe0a15c9bebcll,
-		0x431d67c49c100d4cll, 0x4cc5d4becb3e42b6ll, 0x597f299cfc657e2all,
-		0x5fcb6fab3ad6faecll, 0x6c44198c4a475817ll
+	static const uint64_t K[80] = {
+		0x428a2f98d728ae22ull, 0x7137449123ef65cdull, 0xb5c0fbcfec4d3b2full,
+		0xe9b5dba58189dbbcull, 0x3956c25bf348b538ull, 0x59f111f1b605d019ull,
+		0x923f82a4af194f9bull, 0xab1c5ed5da6d8118ull, 0xd807aa98a3030242ull,
+		0x12835b0145706fbeull, 0x243185be4ee4b28cull, 0x550c7dc3d5ffb4e2ull,
+		0x72be5d74f27b896full, 0x80deb1fe3b1696b1ull, 0x9bdc06a725c71235ull,
+		0xc19bf174cf692694ull, 0xe49b69c19ef14ad2ull, 0xefbe4786384f25e3ull,
+		0x0fc19dc68b8cd5b5ull, 0x240ca1cc77ac9c65ull, 0x2de92c6f592b0275ull,
+		0x4a7484aa6ea6e483ull, 0x5cb0a9dcbd41fbd4ull, 0x76f988da831153b5ull,
+		0x983e5152ee66dfabull, 0xa831c66d2db43210ull, 0xb00327c898fb213full,
+		0xbf597fc7beef0ee4ull, 0xc6e00bf33da88fc2ull, 0xd5a79147930aa725ull,
+		0x06ca6351e003826full, 0x142929670a0e6e70ull, 0x27b70a8546d22ffcull,
+		0x2e1b21385c26c926ull, 0x4d2c6dfc5ac42aedull, 0x53380d139d95b3dfull,
+		0x650a73548baf63deull, 0x766a0abb3c77b2a8ull, 0x81c2c92e47edaee6ull,
+		0x92722c851482353bull, 0xa2bfe8a14cf10364ull, 0xa81a664bbc423001ull,
+		0xc24b8b70d0f89791ull, 0xc76c51a30654be30ull, 0xd192e819d6ef5218ull,
+		0xd69906245565a910ull, 0xf40e35855771202aull, 0x106aa07032bbd1b8ull,
+		0x19a4c116b8d2d0c8ull, 0x1e376c085141ab53ull, 0x2748774cdf8eeb99ull,
+		0x34b0bcb5e19b48a8ull, 0x391c0cb3c5c95a63ull, 0x4ed8aa4ae3418acbull,
+		0x5b9cca4f7763e373ull, 0x682e6ff3d6b2b8a3ull, 0x748f82ee5defb2fcull,
+		0x78a5636f43172f60ull, 0x84c87814a1f0ab72ull, 0x8cc702081a6439ecull,
+		0x90befffa23631e28ull, 0xa4506cebde82bde9ull, 0xbef9a3f7b2c67915ull,
+		0xc67178f2e372532bull, 0xca273eceea26619cull, 0xd186b8c721c0c207ull,
+		0xeada7dd6cde0eb1eull, 0xf57d4f7fee6ed178ull, 0x06f067aa72176fbaull,
+		0x0a637dc5a2c898a6ull, 0x113f9804bef90daeull, 0x1b710b35131c471bull,
+		0x28db77f523047d84ull, 0x32caab7b40c72493ull, 0x3c9ebe0a15c9bebcull,
+		0x431d67c49c100d4cull, 0x4cc5d4becb3e42b6ull, 0x597f299cfc657e2aull,
+		0x5fcb6fab3ad6faecull, 0x6c44198c4a475817ull
 	};
 	register uint32_t t; /* Loop counter. */
 	register uint64_t temp1, temp2; /* Temporary word value. */
@@ -372,10 +367,13 @@ sha2_transform_block128(sha2_ctx_p ctx, uint8_t *block) {
 	/* Initialize the first 16 words in the array W. */
 	sha2_memcpy_bswap8((uint8_t*)W, block, SHA2_512_MSG_BLK_SIZE);
 
+#pragma unroll
 	for (t = 16; t < 80; t ++) {
 		W[t] = (SHA2_64_sigma1(W[(t - 2)]) + W[(t - 7)] +
 			SHA2_64_sigma0(W[(t - 15)]) + W[(t - 16)]);
 	}
+
+#pragma unroll
 	for (t = 0; t < 80; t ++) {
 		temp1 = H + SHA2_64_SIGMA1(E) + SHA2_Ch(E, F, G) + K[t] + W[t];
 		temp2 = SHA2_64_SIGMA0(A) + SHA2_Maj(A, B, C);
@@ -400,15 +398,12 @@ sha2_transform_block128(sha2_ctx_p ctx, uint8_t *block) {
 }
 
 static inline void
-sha2_transform(sha2_ctx_p ctx, uint8_t *block) {
+sha2_transform(sha2_ctx_p ctx, const uint8_t *block) {
 
-	switch (ctx->block_size) {
-	case 64:
+	if (SHA2_256_MSG_BLK_SIZE == ctx->block_size) {
 		sha2_transform_block64(ctx, block);
-		break;
-	case 128:
+	} else {
 		sha2_transform_block128(ctx, block);
-		break;
 	}
 }
 
@@ -429,38 +424,37 @@ sha2_transform(sha2_ctx_p ctx, uint8_t *block) {
  *          The length of the message in message_array
  */
 static inline void
-sha2_update(sha2_ctx_p ctx, uint8_t *data, size_t data_size) {
-	register size_t i;
-	uint32_t index, part_size, mask;
-	uint64_t tm;
+sha2_update(sha2_ctx_p ctx, const uint8_t *data, const size_t data_size) {
+	size_t i, index, part_size, mask;
 
 	if (0 == data_size)
 		return;
 	/* Compute number of bytes mod ctx->block_size. */
 	mask = (ctx->block_size - 1); /* Block size mask. */
-	index = ((ctx->count >> 3) & mask);
+	index = (ctx->count & mask);
 	part_size = (ctx->block_size - index);
 	/* Update number of bits. */
-	tm = ctx->count;
-	ctx->count += (((uint64_t)data_size) << 3);
-	if (tm > ctx->count)
+	ctx->count += data_size;
+	if (ctx->count < data_size) {
 		ctx->count_hi ++;
+	}
 	/* Transform as many times as possible. */
 	if (data_size >= part_size) {
 		if (0 != index) { /* Add data to buffer and process it. */
-			memcpy(&ctx->buffer[index], data, part_size);
-			sha2_transform(ctx, ctx->buffer);
-		} else { /* Proccess all data in loop.  */
+			memcpy((((uint8_t*)ctx->buffer) + index), data, part_size);
+			index = 0;
+			sha2_transform(ctx, (uint8_t*)ctx->buffer);
+		} else { /* Proccess all data in loop. */
 			part_size = 0;
 		}
-		for (i = part_size; (i + mask) < data_size; i += ctx->block_size)
-			sha2_transform(ctx, &data[i]);
-		index = 0;
+		for (i = part_size; (i + mask) < data_size; i += ctx->block_size) {
+			sha2_transform(ctx, (data + i));
+		}
 	} else {
 		i = 0;
 	}
 	/* Buffer remaining data. */
-	memcpy(&ctx->buffer[index], &data[i], (data_size - i));
+	memcpy((((uint8_t*)ctx->buffer) + index), (data + i), (data_size - i));
 }
 
 /*
@@ -488,29 +482,32 @@ sha2_update(sha2_ctx_p ctx, uint8_t *data, size_t data_size) {
  */
 static inline void
 sha2_final(sha2_ctx_p ctx, uint8_t *digest) {
-	uint32_t index, mask, len_off;
+	size_t index, mask, len_off;
 
 	/* Compute number of bytes mod ctx->block_size. */
 	mask = (ctx->block_size - 1); /* Block size mask. */
-	len_off = ((64 == ctx->block_size) ? 56 : 112); /* Message length offset: 64 = 56, 128 = 112. */
-	index = ((ctx->count >> 3) & mask);
-	ctx->buffer[index ++] = 0x80; /* Padding... */
+	len_off = ((SHA2_256_MSG_BLK_SIZE == ctx->block_size) ?
+	    (SHA2_256_MSG_BLK_SIZE - 8) : (SHA2_512_MSG_BLK_SIZE - 16)); /* Message length offset: 64 = 56, 128 = 112. */
+	index = (ctx->count & mask);
+	((uint8_t*)ctx->buffer)[index ++] = 0x80; /* Padding... */
 	if (len_off < index) { /* Not enouth space for message length. */
-		memset(&ctx->buffer[index], 0, (ctx->block_size - index));
-		sha2_transform(ctx, ctx->buffer);
+		memset((((uint8_t*)ctx->buffer) + index), 0x00,
+		    (ctx->block_size - index));
+		sha2_transform(ctx, (uint8_t*)ctx->buffer);
 		index = 0;
 	}
-	memset(&ctx->buffer[index], 0, (len_off - index));
+	memset((((uint8_t*)ctx->buffer) + index), 0x00, (len_off - index));
 	/* Store the message length as the last 8/16 octets. */
-	if (64 == ctx->block_size) {
-		sha2_memcpy_bswap8(&ctx->buffer[len_off], (uint8_t*)&ctx->count, 8);
+	if (SHA2_256_MSG_BLK_SIZE == ctx->block_size) {
+		ctx->buffer[(SHA2_256_MSG_BLK_64CNT - 1)] = bswap64((ctx->count << 3));
 	} else {
-		sha2_memcpy_bswap8(&ctx->buffer[len_off], (uint8_t*)&ctx->count_hi, 8);
-		sha2_memcpy_bswap8(&ctx->buffer[(len_off + 8)], (uint8_t*)&ctx->count, 8);
+		ctx->buffer[(SHA2_512_MSG_BLK_64CNT - 2)] =
+		    bswap64(((ctx->count_hi << 3) | (ctx->count >> (64 - 3))));
+		ctx->buffer[(SHA2_512_MSG_BLK_64CNT - 1)] = bswap64((ctx->count << 3));
 	}
-	sha2_transform(ctx, ctx->buffer);
+	sha2_transform(ctx, (uint8_t*)ctx->buffer);
 	/* Store state in digest. */
-	if (64 == ctx->block_size) {
+	if (SHA2_256_MSG_BLK_SIZE == ctx->block_size) {
 		sha2_memcpy_bswap4(digest, (uint8_t*)ctx->hash, ctx->hash_size);
 	} else {
 		sha2_memcpy_bswap8(digest, (uint8_t*)ctx->hash, ctx->hash_size);
@@ -539,28 +536,30 @@ sha2_final(sha2_ctx_p ctx, uint8_t *digest) {
  * digest - caller digest to be filled in
  */
 static inline void
-hmac_sha2_init(int bits, uint8_t *key, size_t key_len, hmac_sha2_ctx_p hctx) {
-	size_t i;
-	uint64_t k_ipad[(SHA2_MSG_BLK_MAX_SIZE / sizeof(uint64_t))]; /* inner padding - key XORd with ipad. */
+hmac_sha2_init(const size_t bits, const uint8_t *key, const size_t key_len,
+    hmac_sha2_ctx_p hctx) {
+	register size_t i = key_len;
+	uint64_t k_ipad[SHA2_MSG_BLK_MAX_64CNT]; /* inner padding - key XORd with ipad. */
 
 	/* Start out by storing key in pads. */
 	/* If key is longer than block_size bytes reset it to key = SHA2(key). */
 	sha2_init(bits, &hctx->ctx); /* Init context for 1st pass / Get hash params. */
-	if (key_len > hctx->ctx.block_size) {
-		sha2_update(&hctx->ctx, key, key_len);
-		key_len = hctx->ctx.hash_size;
-		sha2_final(&hctx->ctx, (uint8_t*)&k_ipad);
+	if (hctx->ctx.block_size < i) {
+		sha2_update(&hctx->ctx, key, i);
+		i = hctx->ctx.hash_size;
+		sha2_final(&hctx->ctx, (uint8_t*)k_ipad);
 		sha2_init(bits, &hctx->ctx); /* Reinit context for 1st pass. */
 	} else {
-		memcpy(&k_ipad, key, key_len);
+		memcpy(k_ipad, key, i);
 	}
-	memset((((uint8_t*)k_ipad) + key_len), 0, (SHA2_MSG_BLK_MAX_SIZE - key_len));
-	memcpy(hctx->k_opad, k_ipad, SHA2_MSG_BLK_MAX_SIZE);
+	memset((((uint8_t*)k_ipad) + i), 0x00, (SHA2_MSG_BLK_MAX_SIZE - i));
+	memcpy(hctx->k_opad, k_ipad, sizeof(k_ipad));
 
 	/* XOR key with ipad and opad values. */
-	for (i = 0; i < (SHA2_MSG_BLK_MAX_SIZE / sizeof(uint64_t)); i ++) {
-		k_ipad[i] ^= 0x3636363636363636ll;
-		hctx->k_opad[i] ^= 0x5c5c5c5c5c5c5c5cll;
+#pragma unroll
+	for (i = 0; i < SHA2_MSG_BLK_MAX_64CNT; i ++) {
+		k_ipad[i] ^= 0x3636363636363636ull;
+		hctx->k_opad[i] ^= 0x5c5c5c5c5c5c5c5cull;
 	}
 	/* Perform inner SHA2. */
 	sha2_update(&hctx->ctx, (uint8_t*)k_ipad, hctx->ctx.block_size); /* Start with inner pad. */
@@ -569,14 +568,14 @@ hmac_sha2_init(int bits, uint8_t *key, size_t key_len, hmac_sha2_ctx_p hctx) {
 }
 
 static inline void
-hmac_sha2_update(hmac_sha2_ctx_p hctx, uint8_t *data, size_t data_size) {
+hmac_sha2_update(hmac_sha2_ctx_p hctx, const uint8_t *data, const size_t data_size) {
 
 	sha2_update(&hctx->ctx, data, data_size); /* Then data of datagram. */
 }
 
 static inline void
 hmac_sha2_final(hmac_sha2_ctx_p hctx, uint8_t *digest, size_t *digest_size) {
-	int bits;
+	size_t bits;
 
 	bits = hctx->ctx.hash_size;
 	sha2_final(&hctx->ctx, digest); /* Finish up 1st pass. */
@@ -584,18 +583,20 @@ hmac_sha2_final(hmac_sha2_ctx_p hctx, uint8_t *digest, size_t *digest_size) {
 	sha2_init(bits, &hctx->ctx); /* Init context for 2nd pass. */
 	sha2_update(&hctx->ctx, (uint8_t*)hctx->k_opad, hctx->ctx.block_size); /* Start with outer pad. */
 	sha2_update(&hctx->ctx, digest, hctx->ctx.hash_size); /* Then results of 1st hash. */
-	if (NULL != digest_size)
+	if (NULL != digest_size) {
 		(*digest_size) = hctx->ctx.hash_size;
+	}
 	sha2_final(&hctx->ctx, digest); /* Finish up 2nd pass. */
 	/* Zeroize sensitive information. */
 	sha2_bzero(hctx->k_opad, sizeof(hctx->k_opad));
 }
 
 static inline void
-hmac_sha2(int bits, uint8_t *key, size_t key_len, uint8_t *data, size_t data_size,
+hmac_sha2(const size_t bits, const uint8_t *key, const size_t key_len,
+    const uint8_t *data, const size_t data_size,
     uint8_t *digest, size_t *digest_size) {
 	hmac_sha2_ctx_t hctx;
-	
+
 	hmac_sha2_init(bits, key, key_len, &hctx);
 	hmac_sha2_update(&hctx, data, data_size);
 	hmac_sha2_final(&hctx, digest, digest_size);
@@ -603,9 +604,10 @@ hmac_sha2(int bits, uint8_t *key, size_t key_len, uint8_t *data, size_t data_siz
 
 
 static inline void
-sha2_cvt_hex(uint8_t *bin, size_t bin_size, uint8_t *hex) {
-	static uint8_t *hex_tbl = (uint8_t*)"0123456789abcdef";
-	register uint8_t *bin_max, byte;
+sha2_cvt_hex(const uint8_t *bin, const size_t bin_size, uint8_t *hex) {
+	static const uint8_t *hex_tbl = (const uint8_t*)"0123456789abcdef";
+	register const uint8_t *bin_max;
+	register uint8_t byte;
 
 	for (bin_max = (bin + bin_size); bin < bin_max; bin ++) {
 		byte = (*bin);
@@ -613,110 +615,121 @@ sha2_cvt_hex(uint8_t *bin, size_t bin_size, uint8_t *hex) {
 		(*hex ++) = hex_tbl[(byte & 0x0f)];
 	}
 	(*hex) = 0;
-};
+}
 
 
 /* Other staff. */
 static inline void
-sha2_cvt_strA(uint8_t *digest, size_t digest_size, char *digest_str) {
+sha2_cvt_strA(const uint8_t *digest, const size_t digest_size, char *digest_str) {
+
 	sha2_cvt_hex(digest, digest_size, (uint8_t*)digest_str);
-};
+}
 
 #ifdef _WINDOWS
 static inline void
-sha2_cvt_strW(uint8_t *digest, size_t digest_size, LPWSTR digest_str) {
+sha2_cvt_strW(const uint8_t *digest, size_t digest_size, LPWSTR digest_str) {
 	register size_t i, j;
 
-	for (i = 0, j = 0; i < digest_size; i ++, j += 2)
+	for (i = 0, j = 0; i < digest_size; i ++, j += 2) {
 		wsprintfW((LPWSTR)(digest_str + j), L"%02x", digest[i]);
+	}
 	digest_str[j] = 0;
-};
+}
 #endif
 
 
 static inline void
-sha2_get_digest(int bits, void *data, size_t data_size,
+sha2_get_digest(const size_t bits, const void *data, const size_t data_size,
     uint8_t *digest, size_t *digest_size) {
 	sha2_ctx_t ctx;
 
 	sha2_init(bits, &ctx);
-	sha2_update(&ctx, (uint8_t*)data, data_size);
-	if (NULL != digest_size)
+	sha2_update(&ctx, data, data_size);
+	if (NULL != digest_size) {
 		(*digest_size) = ctx.hash_size;
+	}
 	sha2_final(&ctx, digest);
 }
 
 
 static inline void
-sha2_get_digest_strA(int bits, char *data, size_t data_size,
+sha2_get_digest_strA(const size_t bits, const char *data, const size_t data_size,
     char *digest_str, size_t *digest_str_size) {
 	sha2_ctx_t ctx;
 	size_t digest_size;
 	uint8_t digest[SHA2_HASH_MAX_SIZE];
 
 	sha2_init(bits, &ctx);
-	sha2_update(&ctx, (uint8_t*)data, data_size);
+	sha2_update(&ctx, (const uint8_t*)data, data_size);
 	digest_size = ctx.hash_size;
 	sha2_final(&ctx, digest);
 
 	sha2_cvt_strA(digest, digest_size, digest_str);
-	if (NULL != digest_str_size)
+	if (NULL != digest_str_size) {
 		(*digest_str_size) = (digest_size * 2);
+	}
 }
 
 #ifdef _WINDOWS
 static inline void
-sha2_get_digest_strW(int bits, LPWSTR data, size_t data_size,
-    LPWSTR digest_str, size_t *digest_str_size) {
+sha2_get_digest_strW(const size_t bits, const LPWSTR data, const size_t data_size,
+    const LPWSTR digest_str, size_t *digest_str_size) {
 	sha2_ctx_t ctx;
 	size_t digest_size;
 	uint8_t digest[SHA2_HASH_MAX_SIZE];
 
 	sha2_init(bits, &ctx);
-	sha2_update(&ctx, (uint8_t*)data, data_size);
+	sha2_update(&ctx, (const uint8_t*)data, data_size);
 	digest_size = ctx.hash_size;
 	sha2_final(&ctx, digest);
 
 	sha2_cvt_strW(digest, digest_size, digest_str);
-	if (NULL != digest_str_size)
+	if (NULL != digest_str_size) {
 		(*digest_str_size) = (digest_size * 2);
+	}
 }
 #endif
 
 
 static inline void
-sha2_hmac_get_digest(int bits, void *key, size_t key_size,
-    void *data, size_t data_size, uint8_t *digest, size_t *digest_size) {
+sha2_hmac_get_digest(const size_t bits, const void *key, const size_t key_size,
+    const void *data, const size_t data_size, uint8_t *digest,
+    size_t *digest_size) {
 
-	hmac_sha2(bits, (uint8_t*)key, key_size, (uint8_t*)data, data_size, digest, digest_size);
+	hmac_sha2(bits, (const uint8_t*)key, key_size,
+	    (const uint8_t*)data, data_size, digest, digest_size);
 }
 
 
 static inline void
-sha2_hmac_get_digest_strA(int bits, char *key, size_t key_size,
-    char *data, size_t data_size, char *digest_str, size_t *digest_str_size) {
+sha2_hmac_get_digest_strA(const size_t bits, const char *key, const size_t key_size,
+    const char *data, const size_t data_size, 
+    char *digest_str, size_t *digest_str_size) {
 	size_t digest_size;
 	uint8_t digest[SHA2_HASH_MAX_SIZE];
 
-	hmac_sha2(bits, (uint8_t*)key, key_size, (uint8_t*)data, data_size,
-	    digest, &digest_size);
+	hmac_sha2(bits, (const uint8_t*)key, key_size,
+	    (const uint8_t*)data, data_size, digest, &digest_size);
 	sha2_cvt_strA(digest, digest_size, digest_str);
-	if (NULL != digest_str_size)
+	if (NULL != digest_str_size) {
 		(*digest_str_size) = (digest_size * 2);
+	}
 }
 
 #ifdef _WINDOWS
 static inline void
-sha2_hmac_get_digest_strW(int bits, LPWSTR key, size_t key_size,
-    LPWSTR data, size_t data_size, LPWSTR digest_str, size_t *digest_str_size) {
+sha2_hmac_get_digest_strW(const size_t bits, const LPWSTR key, const size_t key_size,
+    const LPWSTR data, const size_t data_size,
+    LPWSTR digest_str, size_t *digest_str_size) {
 	size_t digest_size;
 	uint8_t digest[SHA2_HASH_MAX_SIZE];
 
-	hmac_sha2(bits, (uint8_t*)key, key_size, (uint8_t*)data, data_size,
-	    digest, &digest_size);
+	hmac_sha2(bits, (const uint8_t*)key, key_size,
+	    (const uint8_t*)data, data_size, digest, &digest_size);
 	sha2_cvt_strW(digest, digest_size, digest_str);
-	if (NULL != digest_str_size)
+	if (NULL != digest_str_size) {
 		(*digest_str_size) = (digest_size * 2);
+	}
 }
 #endif
 
@@ -724,7 +737,7 @@ sha2_hmac_get_digest_strW(int bits, LPWSTR key, size_t key_size,
 #ifdef SHA2_SELF_TEST
 /* 0 - OK, non zero - error */
 static inline int
-sha2_self_test() {
+sha2_self_test(void) {
 	size_t i;
 	char digest_str[SHA2_HASH_STR_MAX_SIZE + 1]; /* Calculated digest. */
 	char *data[] = {
@@ -963,4 +976,4 @@ sha2_self_test() {
 #endif
 
 
-#endif // SHA2_H__INCLUDED_
+#endif // __SHA2_H__INCLUDED__

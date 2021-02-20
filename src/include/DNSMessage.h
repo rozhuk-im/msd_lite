@@ -29,18 +29,8 @@
 
 
 
-#if !defined(AFX_DNSMESSAGE__H__INCLUDED_)
-#define AFX_DNSMESSAGE__H__INCLUDED_
-
-
-#if _MSC_VER > 1000
-#pragma once
-#endif // _MSC_VER > 1000
-
-
-
-#include "mem_find.h"
-#include "buf_case.h"
+#ifndef __DNSMESSAGE_H__
+#define __DNSMESSAGE_H__
 
 
 #ifdef _WINDOWS
@@ -60,6 +50,8 @@
 #	include <string.h> /* bcopy, bzero, memcpy, memmove, memset, strnlen, strerror... */
 #	include <netinet/in.h> /* ntohs(), htons(), ntohl(), htonl() */
 #endif
+
+#include "mem_helpers.h"
 
 
 
@@ -476,7 +468,7 @@ typedef struct dns_hdr_s {
 
 
 
-#if defined(_WINDOWS)
+#ifdef _WINDOWS
 static inline DWORD
 rcode2win32err(uint16_t rcode16) {
 	return (((rcode16) ?
@@ -534,18 +526,18 @@ DomainNameZonesReverce(uint8_t *dst, const uint8_t *src, size_t name_len) {
 	src_dot_pos = src;
 	dst_pos = (dst + name_len + 1);
 	for (;;) {
-		src_dot_pos = (uint8_t *)mem_find_byte((src_dot_pos - src), src,
+		src_dot_pos = (uint8_t*)mem_chr_ptr(src_dot_pos, src,
 		    name_len, '.');
-		if (NULL == src_dot_pos) {// òî÷êà íå íàéäåíà, ñ÷èòàåì ÷òî îíà â êîíöå ñòðîêè
+		if (NULL == src_dot_pos) {// Ñ‚Ð¾Ñ‡ÐºÐ° Ð½Ðµ Ð½Ð°Ð¹Ð´ÐµÐ½Ð°, ÑÑ‡Ð¸Ñ‚Ð°ÐµÐ¼ Ñ‡Ñ‚Ð¾ Ð¾Ð½Ð° Ð² ÐºÐ¾Ð½Ñ†Ðµ ÑÑ‚Ñ€Ð¾ÐºÐ¸
 			cp_size = ((name_len - (src_pos - src)) + 1);
 			dst_pos -= cp_size;
 			memcpy(dst_pos, src_pos, cp_size);
-			(*((uint8_t *)(dst_pos + (cp_size - 1)))) = '.';
+			(*((uint8_t*)(dst_pos + (cp_size - 1)))) = '.';
 			dst[name_len] = 0;
 			return;
 		}
-		// òî÷êà íàéäåíà, âû÷èñëÿåì äëèííó îò ïðåäóäóùåé òî÷êè è çàïèñûâàåì å¸ âìåñòî
-		// ïðåäûäóùåé, åñëè ïðåäûäóùåå íåáûëî, òî ïèøåì ïåðåä ñòðîêîé
+		// Ñ‚Ð¾Ñ‡ÐºÐ° Ð½Ð°Ð¹Ð´ÐµÐ½Ð°, Ð²Ñ‹Ñ‡Ð¸ÑÐ»ÑÐµÐ¼ Ð´Ð»Ð¸Ð½Ð½Ñƒ Ð¾Ñ‚ Ð¿Ñ€ÐµÐ´ÑƒÐ´ÑƒÑ‰ÐµÐ¹ Ñ‚Ð¾Ñ‡ÐºÐ¸ Ð¸ Ð·Ð°Ð¿Ð¸ÑÑ‹Ð²Ð°ÐµÐ¼ ÐµÑ‘ Ð²Ð¼ÐµÑÑ‚Ð¾
+		// Ð¿Ñ€ÐµÐ´Ñ‹Ð´ÑƒÑ‰ÐµÐ¹, ÐµÑÐ»Ð¸ Ð¿Ñ€ÐµÐ´Ñ‹Ð´ÑƒÑ‰ÐµÐµ Ð½ÐµÐ±Ñ‹Ð»Ð¾, Ñ‚Ð¾ Ð¿Ð¸ÑˆÐµÐ¼ Ð¿ÐµÑ€ÐµÐ´ ÑÑ‚Ñ€Ð¾ÐºÐ¾Ð¹
 		cp_size = ((src_dot_pos - src_pos) + 1);
 		dst_pos -= cp_size;
 		memcpy(dst_pos, src_pos, cp_size);
@@ -565,7 +557,7 @@ DomainNameZonesGetCount(const uint8_t *name, size_t name_len) {
 	dot_pos = name;
 	ret = 1;
 	for (;;) {
-		dot_pos = (const uint8_t *)mem_find_byte((dot_pos - name), name,
+		dot_pos = (uint8_t*)mem_chr_ptr(dot_pos, name,
 		    name_len, '.');
 		if (NULL == dot_pos)
 			return (ret);
@@ -582,13 +574,13 @@ DomainNameZonesLeft(const uint8_t *name, size_t name_len, size_t zones_count,
 	const uint8_t *dot_pos;
 
 	if (NULL != name_ret)
-		(*name_ret) = (uint8_t *)((size_t)name);
+		(*name_ret) = (uint8_t*)((size_t)name);
 	if (NULL == name || 0 == name_len || 0 == zones_count)
 		return (0);
 
 	dot_pos = name;
 	for (; 0 != zones_count; zones_count --) {
-		dot_pos = (const uint8_t *)mem_find_byte((dot_pos - name), name,
+		dot_pos = (uint8_t*)mem_chr_ptr(dot_pos, name,
 		    name_len, '.');
 		if (NULL == dot_pos) {// dot not found, let it be at the end of string
 			dot_pos = (name + name_len + 1);
@@ -609,30 +601,30 @@ DomainNameZonesRight(const uint8_t *name, size_t name_len, size_t zones_count,
 		return (0);
 	if (0 == zones_count) {
 		if (NULL != name_ret)
-			(*name_ret) = (uint8_t *)(((size_t)name) + name_len);
+			(*name_ret) = (uint8_t*)(((size_t)name) + name_len);
 		return (0);
 	}
 
 	name_end = (name + name_len);
 	dot_pos = (name_end + 1);
 	for (; 0 != zones_count; zones_count --) {
-		dot_pos = (const uint8_t*)mem_find_byte_rev(((name_end - dot_pos) + 1),
+		dot_pos = (uint8_t*)mem_rchr_off(((name_end - dot_pos) + 1),
 		    name, name_len, '.');
 		if (NULL == dot_pos) {// dot not found for this zones count, return full name
 			if (NULL != name_ret)
-				(*name_ret) = (uint8_t *)((size_t)name);
+				(*name_ret) = (uint8_t*)((size_t)name);
 			return (name_len);
 		}
 	}
 	dot_pos ++;// move from dot
 	if (NULL != name_ret)
-		(*name_ret) = (uint8_t *)((size_t)dot_pos);
+		(*name_ret) = (uint8_t*)((size_t)dot_pos);
 
 	return ((name_end - dot_pos));
 }
 
 
-// êîïðèðóåò èìÿ õîñòà â áóôôåð è çàìåíÿåò â í¸ì = . = íà äëèííó, íå ïðîèçâîäèò êîìïðåñèþ
+// ÐºÐ¾Ð¿Ñ€Ð¸Ñ€ÑƒÐµÑ‚ Ð¸Ð¼Ñ Ñ…Ð¾ÑÑ‚Ð° Ð² Ð±ÑƒÑ„Ñ„ÐµÑ€ Ð¸ Ð·Ð°Ð¼ÐµÐ½ÑÐµÑ‚ Ð² Ð½Ñ‘Ð¼ = . = Ð½Ð° Ð´Ð»Ð¸Ð½Ð½Ñƒ, Ð½Ðµ Ð¿Ñ€Ð¾Ð¸Ð·Ð²Ð¾Ð´Ð¸Ñ‚ ÐºÐ¾Ð¼Ð¿Ñ€ÐµÑÐ¸ÑŽ
 static inline int
 DomainNameToSequenceOfLabels(const uint8_t *name, size_t name_len, uint8_t *buf,
     size_t buf_size, size_t *name_size_ret) {
@@ -650,29 +642,29 @@ DomainNameToSequenceOfLabels(const uint8_t *name, size_t name_len, uint8_t *buf,
 	if (name_size > buf_size) // small buf
 		return (EOVERFLOW);
 	if (0 == name_len) {
-		(*((uint8_t *)buf)) = 0;// store null label = end marker
+		(*((uint8_t*)buf)) = 0;// store null label = end marker
 		return (0);
 	}
 
 	label_pos = buf; // first label contain len
 	dot_pos = (label_pos + 1); // ponts to start of domain name
 	memcpy(dot_pos, name, name_len); // copy domain name to new place (or move it 1 byte from start)
-	(*(uint8_t *)(buf + name_len + 1)) = 0; // store null label = end marker
+	(*(uint8_t*)(buf + name_len + 1)) = 0; // store null label = end marker
 
 	// now replace dots by labels with len
 	for (;;) {
-		dot_pos = (uint8_t *)mem_find_byte((dot_pos - buf), buf, name_size, '.');
+		dot_pos = (uint8_t*)mem_chr_ptr(dot_pos, buf, name_size, '.');
 		if (NULL == dot_pos) {// dot not found, let it be at the end of string
 			len = (((buf + name_size) - label_pos) - 2);// '-2': dont count dot and last null label (end marker)
 			if (0 == len || SEQ_LABEL_DATA_MASK < len) // label max size is 63 bytes
 				return (EINVAL);
-			(*(uint8_t *)label_pos) = (uint8_t)len;
+			(*(uint8_t*)label_pos) = (uint8_t)len;
 			return (0);
 		}
 		len = ((dot_pos - label_pos) - 1);// '-1': dont count dot
 		if (0 == len || SEQ_LABEL_DATA_MASK < len) // label max size is 63 bytes
 			return (EINVAL);
-		(*(uint8_t *)label_pos) = (uint8_t)len;
+		(*(uint8_t*)label_pos) = (uint8_t)len;
 		label_pos = dot_pos;
 		dot_pos ++;// move next
 	}
@@ -680,7 +672,7 @@ DomainNameToSequenceOfLabels(const uint8_t *name, size_t name_len, uint8_t *buf,
 }
 
 
-// âîçâðàùàåò ðàçìåð çàíèìàåìûé SequenceOfLabels íå îáðàùàÿ âíèìàíèÿ íà êîìïðåñèþ
+// Ð²Ð¾Ð·Ð²Ñ€Ð°Ñ‰Ð°ÐµÑ‚ Ñ€Ð°Ð·Ð¼ÐµÑ€ Ð·Ð°Ð½Ð¸Ð¼Ð°ÐµÐ¼Ñ‹Ð¹ SequenceOfLabels Ð½Ðµ Ð¾Ð±Ñ€Ð°Ñ‰Ð°Ñ Ð²Ð½Ð¸Ð¼Ð°Ð½Ð¸Ñ Ð½Ð° ÐºÐ¾Ð¼Ð¿Ñ€ÐµÑÐ¸ÑŽ
 static inline int
 SequenceOfLabelsGetSize(const uint8_t *buf, size_t buf_size, size_t *name_len_ret) {
 	const uint8_t *cur_pos, *max_pos;
@@ -691,7 +683,7 @@ SequenceOfLabelsGetSize(const uint8_t *buf, size_t buf_size, size_t *name_len_re
 
 	cur_pos = buf;
 	max_pos = (cur_pos + buf_size);
-	for (;;) {// ïåðåáèðàåì âñå êóñêè òåêñòà
+	for (;;) {// Ð¿ÐµÑ€ÐµÐ±Ð¸Ñ€Ð°ÐµÐ¼ Ð²ÑÐµ ÐºÑƒÑÐºÐ¸ Ñ‚ÐµÐºÑÑ‚Ð°
 		label = (*cur_pos);
 		cur_pos ++; // now it points to data
 		switch((label & SEQ_LABEL_CTRL_MASK)){
@@ -721,7 +713,7 @@ SequenceOfLabelsGetSize(const uint8_t *buf, size_t buf_size, size_t *name_len_re
 }
 
 
-// êîïèðóåì èìÿ õîñòà, çàìåíÿåì äëèííó íà = . = , èãíîðèðóåì êîìïðåñèþ
+// ÐºÐ¾Ð¿Ð¸Ñ€ÑƒÐµÐ¼ Ð¸Ð¼Ñ Ñ…Ð¾ÑÑ‚Ð°, Ð·Ð°Ð¼ÐµÐ½ÑÐµÐ¼ Ð´Ð»Ð¸Ð½Ð½Ñƒ Ð½Ð° = . = , Ð¸Ð³Ð½Ð¾Ñ€Ð¸Ñ€ÑƒÐµÐ¼ ÐºÐ¾Ð¼Ð¿Ñ€ÐµÑÐ¸ÑŽ
 static inline int
 SequenceOfLabelsToDomainName(const uint8_t *buf, size_t buf_size, uint8_t *name,
     size_t name_buf_size, size_t *name_len_ret) {
@@ -738,7 +730,7 @@ SequenceOfLabelsToDomainName(const uint8_t *buf, size_t buf_size, uint8_t *name,
 
 	cur_pos = buf;
 	max_pos = (cur_pos + buf_size);
-	for (;;) {// ïåðåáèðàåì âñå êóñêè òåêñòà
+	for (;;) {// Ð¿ÐµÑ€ÐµÐ±Ð¸Ñ€Ð°ÐµÐ¼ Ð²ÑÐµ ÐºÑƒÑÐºÐ¸ Ñ‚ÐµÐºÑÑ‚Ð°
 		label = (*cur_pos);
 		if ((label & SEQ_LABEL_CTRL_MASK) != SEQ_LABEL_CTRL_LEN)
 			return (EOPNOTSUPP);// unsupported label type (possible ends)
@@ -795,7 +787,7 @@ dns_hdr_rcode_get(dns_hdr_p hdr) {
 	return (hdr->flags.bits.rcode);
 }
 
-#if defined(_WINDOWS)
+#ifdef _WINDOWS
 static inline DWORD
 dns_hdr_win32err_get(dns_hdr_p hdr) {
 	// EDNS0: RR_OPT has another 8 bit rcode value
@@ -936,7 +928,7 @@ dns_msg_name2sequence_of_labels(dns_hdr_p hdr, size_t msgbuf_size, size_t offset
 	if (0 != compress) // XXX not implemented et
 		return (EOPNOTSUPP);
 
-	buf = (((uint8_t *)hdr) + offset);
+	buf = (((uint8_t*)hdr) + offset);
 	error = DomainNameToSequenceOfLabels(name, name_len, buf,
 	    (msgbuf_size - offset), name_size_ret);
 
@@ -957,16 +949,16 @@ dns_msg_sequence_of_labels_get_name_len(dns_hdr_p hdr, size_t msg_size,
 	if (sizeof(dns_hdr_t) > msg_size)
 		return (EBADMSG);
 
-	cur_pos = (((uint8_t *)hdr) + offset);
+	cur_pos = (((uint8_t*)hdr) + offset);
 	max_pos = (cur_pos + msg_size); // XXX check this!
 	name_len = 0;
-	for (jumps = 0; jumps < DNS_MAX_NAME_CYCLES;) {// ïåðåáèðàåì âñå êóñêè òåêñòà
-		label = (*((uint8_t *)cur_pos));
+	for (jumps = 0; jumps < DNS_MAX_NAME_CYCLES;) {// Ð¿ÐµÑ€ÐµÐ±Ð¸Ñ€Ð°ÐµÐ¼ Ð²ÑÐµ ÐºÑƒÑÐºÐ¸ Ñ‚ÐµÐºÑÑ‚Ð°
+		label = (*((uint8_t*)cur_pos));
 		if ((label & SEQ_LABEL_CTRL_MASK) == SEQ_LABEL_CTRL_COMPRESSED) {
-			// SEQ_LABEL_CTRL_COMPRESSED îçíà÷àåò ÷òî óêàçàííî ñìåùåíèå à íå äëèííà
+			// SEQ_LABEL_CTRL_COMPRESSED Ð¾Ð·Ð½Ð°Ñ‡Ð°ÐµÑ‚ Ñ‡Ñ‚Ð¾ ÑƒÐºÐ°Ð·Ð°Ð½Ð½Ð¾ ÑÐ¼ÐµÑ‰ÐµÐ½Ð¸Ðµ Ð° Ð½Ðµ Ð´Ð»Ð¸Ð½Ð½Ð°
 			offset = (ntohs((*((uint16_t *)cur_pos))) &
 			    SEQ_LABEL_COMPRESSED_DATA_MASK);
-			new_pos = (((uint8_t *)hdr) + offset);
+			new_pos = (((uint8_t*)hdr) + offset);
 			if (msg_size < offset || sizeof(dns_hdr_t) > offset ||
 			    cur_pos == new_pos)
 				return (EBADMSG);// bad pointer
@@ -1009,16 +1001,16 @@ dns_msg_sequence_of_labels2name(dns_hdr_p hdr, size_t msg_size, size_t offset,
 	if (sizeof(dns_hdr_t) > msg_size)
 		return (EBADMSG);
 
-	cur_pos = (((uint8_t *)hdr) + offset);
+	cur_pos = (((uint8_t*)hdr) + offset);
 	max_pos = (cur_pos + msg_size); // XXX check this!
 	name_len = 0;
-	for (jumps = 0; jumps < DNS_MAX_NAME_CYCLES;) {// ïåðåáèðàåì âñå êóñêè òåêñòà
-		label = (*((uint8_t *)cur_pos));
+	for (jumps = 0; jumps < DNS_MAX_NAME_CYCLES;) {// Ð¿ÐµÑ€ÐµÐ±Ð¸Ñ€Ð°ÐµÐ¼ Ð²ÑÐµ ÐºÑƒÑÐºÐ¸ Ñ‚ÐµÐºÑÑ‚Ð°
+		label = (*((uint8_t*)cur_pos));
 		if ((label & SEQ_LABEL_CTRL_MASK) == SEQ_LABEL_CTRL_COMPRESSED) {
-			// SEQ_LABEL_CTRL_COMPRESSED îçíà÷àåò ÷òî óêàçàííî ñìåùåíèå à íå äëèííà
+			// SEQ_LABEL_CTRL_COMPRESSED Ð¾Ð·Ð½Ð°Ñ‡Ð°ÐµÑ‚ Ñ‡Ñ‚Ð¾ ÑƒÐºÐ°Ð·Ð°Ð½Ð½Ð¾ ÑÐ¼ÐµÑ‰ÐµÐ½Ð¸Ðµ Ð° Ð½Ðµ Ð´Ð»Ð¸Ð½Ð½Ð°
 			offset = (ntohs((*((uint16_t *)cur_pos))) &
 			    SEQ_LABEL_COMPRESSED_DATA_MASK);
-			new_pos = (((uint8_t *)hdr) + offset);
+			new_pos = (((uint8_t*)hdr) + offset);
 			if (msg_size < offset || sizeof(dns_hdr_t) > offset ||
 			    cur_pos == new_pos)
 				return (EBADMSG);// bad pointer
@@ -1051,7 +1043,7 @@ dns_msg_sequence_of_labels2name(dns_hdr_p hdr, size_t msg_size, size_t offset,
 				(*name_len_ret) = name_len;
 			return (EOVERFLOW);
 		}
-		// ìåñòî â áóôôåðå êóäà êîïèðóåòñÿ èìÿ åù¸ åñòü
+		// Ð¼ÐµÑÑ‚Ð¾ Ð² Ð±ÑƒÑ„Ñ„ÐµÑ€Ðµ ÐºÑƒÐ´Ð° ÐºÐ¾Ð¿Ð¸Ñ€ÑƒÐµÑ‚ÑÑ Ð¸Ð¼Ñ ÐµÑ‰Ñ‘ ÐµÑÑ‚ÑŒ
 		memcpy(name, cur_pos, label);
 		name += label;
 		(*name) = '.';
@@ -1079,7 +1071,7 @@ dns_msg_question_add(dns_hdr_p hdr, size_t msg_size, size_t msgbuf_size,
 	if (sizeof(dns_hdr_t) > msg_size)
 		return (EBADMSG);
 	question_size = (msg_size + (2 + name_len) +
-	    (sizeof(dns_question_t) - sizeof(uint8_t *)));
+	    (sizeof(dns_question_t) - sizeof(uint8_t*)));
 	if (msgbuf_size < question_size) {
 		if (NULL != msg_size_ret)
 			(*msg_size_ret) = question_size;
@@ -1092,14 +1084,14 @@ dns_msg_question_add(dns_hdr_p hdr, size_t msg_size, size_t msgbuf_size,
 		return (error);
 
 	question = (dns_question_p)((((size_t)hdr) + msg_size +
-	    labels_sequence_size) - sizeof(uint8_t *));
+	    labels_sequence_size) - sizeof(uint8_t*));
 	question_size = (msg_size + labels_sequence_size +
-	    (sizeof(dns_question_t) - sizeof(uint8_t *)));
+	    (sizeof(dns_question_t) - sizeof(uint8_t*)));
 
 	//question->name;
 	question->type = htons(query_type);
 	question->class = htons(query_class);
-	// óâåëè÷èâàåì ñ÷¸ò÷èê âîïðîñîâ â çàãîëîâêå
+	// ÑƒÐ²ÐµÐ»Ð¸Ñ‡Ð¸Ð²Ð°ÐµÐ¼ ÑÑ‡Ñ‘Ñ‚Ñ‡Ð¸Ðº Ð²Ð¾Ð¿Ñ€Ð¾ÑÐ¾Ð² Ð² Ð·Ð°Ð³Ð¾Ð»Ð¾Ð²ÐºÐµ
 	dns_hdr_qd_inc(hdr, 1);
 
 	if (NULL != msg_size_ret)
@@ -1123,12 +1115,12 @@ dns_msg_question_get_data(dns_hdr_p hdr, size_t msg_size, size_t offset,
 		return (EBADMSG);
 
 	/* Get name size to get access to another RR data. */
-	if (0 != SequenceOfLabelsGetSize((((uint8_t *)hdr) + offset),
+	if (0 != SequenceOfLabelsGetSize((((uint8_t*)hdr) + offset),
 	    (msg_size - offset), &name_size))
 		return (EBADMSG);
 	question = (dns_question_p)((((size_t)hdr) + offset + name_size) -
-	    sizeof(uint8_t *));
-	question_size = (name_size + (sizeof(dns_question_t) - sizeof(uint8_t *)));
+	    sizeof(uint8_t*));
+	question_size = (name_size + (sizeof(dns_question_t) - sizeof(uint8_t*)));
 	if ((offset + question_size) > msg_size)
 		return (EBADMSG); /* Out of buf range. */
 
@@ -1171,7 +1163,7 @@ dns_msg_rr_add(dns_hdr_p hdr, size_t msg_size, size_t msgbuf_size, int compress,
 	if (sizeof(dns_hdr_t) > msg_size)
 		return (EBADMSG);
 	rr_size_tm = (msg_size + (2 + name_len) + (sizeof(dns_rr_t) -
-	    (sizeof(uint8_t *) + sizeof(uint8_t))) + data_size);
+	    (sizeof(uint8_t*) + sizeof(uint8_t))) + data_size);
 	if (NULL != rr_size)
 		(*rr_size) = rr_size_tm;
 	if (msgbuf_size < rr_size_tm) 
@@ -1184,9 +1176,9 @@ dns_msg_rr_add(dns_hdr_p hdr, size_t msg_size, size_t msgbuf_size, int compress,
 		return (error);
 
 	rr = (dns_rr_p)((((size_t)hdr) + msg_size + labels_sequence_size) -
-	    sizeof(uint8_t *));
+	    sizeof(uint8_t*));
 	rr_size_tm = (msg_size + labels_sequence_size + (sizeof(dns_rr_t) -
-	    (sizeof(uint8_t *) + sizeof(uint8_t))) + data_size);
+	    (sizeof(uint8_t*) + sizeof(uint8_t))) + data_size);
 
 	//rr->name = ;
 	rr->type = htons(type);
@@ -1249,19 +1241,19 @@ dns_msg_rr_get_data(dns_hdr_p hdr, size_t msg_size, size_t offset, uint8_t *name
 		return (EBADMSG);
 
 	/* Get name size and skeep it to get other data. */
-	if (0 != SequenceOfLabelsGetSize((((uint8_t *)hdr) + offset),
+	if (0 != SequenceOfLabelsGetSize((((uint8_t*)hdr) + offset),
 	    (msg_size - offset), &name_size))
 		return (EBADMSG);
 
-	dns_rr = (dns_rr_p)((((size_t)hdr) + offset + name_size) - sizeof(uint8_t *));
-	rr_size_tm = (name_size + (sizeof(dns_rr_t) - (sizeof(uint8_t *) +
+	dns_rr = (dns_rr_p)((((size_t)hdr) + offset + name_size) - sizeof(uint8_t*));
+	rr_size_tm = (name_size + (sizeof(dns_rr_t) - (sizeof(uint8_t*) +
 	    sizeof(uint8_t))) + ntohs(dns_rr->rdlength));
 	if ((offset + rr_size_tm) > msg_size)
 		return (EBADMSG); /* Out of buf range. */
 
 	if (NULL != name && 0 != name_len)
 		error = dns_msg_sequence_of_labels2name(hdr, msg_size, offset,
-		    (uint8_t *)name, (*name_len), name_len);
+		    (uint8_t*)name, (*name_len), name_len);
 	if (NULL != type)
 		(*type) = ntohs(dns_rr->type);
 	if (NULL != class)
@@ -1315,7 +1307,7 @@ dns_msg_rr_find(dns_hdr_p hdr, size_t msg_size, size_t *offset_ret, size_t *rr_c
 			i = 0;
 			goto out_ret;
 		}
-		if (0 == buf_cmpi(name, name_len, nametm, name_lentm)) {
+		if (0 == mem_cmpin(name, name_len, nametm, name_lentm)) {
 			/* Founded!!! */
 			if (NULL != rr_size)
 				(*rr_size) = rr_size_tm;
@@ -1435,4 +1427,4 @@ dns_msg_validate(dns_hdr_p hdr, size_t msgbuf_size) {
 
 
 
-#endif // AFX_DNSMESSAGE__H__INCLUDED_
+#endif // __DNSMESSAGE_H__

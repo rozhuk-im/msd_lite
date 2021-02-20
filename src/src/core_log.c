@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2011 - 2014 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2011 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,10 +29,10 @@
 
 
 #include <sys/param.h>
-#ifndef BSD
-#define _GNU_SOURCE /* See feature_test_macros(7) */
-#define __USE_GNU 1
-#endif
+#ifdef __linux__ /* Linux specific code. */
+#	define _GNU_SOURCE /* See feature_test_macros(7) */
+#	define __USE_GNU 1
+#endif /* Linux specific code. */
 #include <sys/types.h>
 #include <errno.h>
 #include <stdio.h> /* snprintf, fprintf */
@@ -43,150 +43,156 @@
 #include <time.h>
 
 #include "core_log.h"
-#include "core_macro.h"
+#include "macro_helpers.h"
 
 
-int core_log_fd = -1;
+uintptr_t core_log_fd = (uintptr_t)-1;
 
 
 
 void
-log_write_fd(int fd, const char *data, size_t data_size) {
+log_write_fd(uintptr_t fd, const char *data, size_t data_size) {
 
-	if (-1 == fd || NULL == data || 0 == data_size)
+	if ((uintptr_t)-1 == fd || NULL == data || 0 == data_size)
 		return;
-
-	fd = write(fd, data, data_size);
+	write((int)fd, data, data_size);
 }
 
 void
-log_write_err_fd(int fd, const char *fname, int line, int error, const char *descr) {
-	char buf[2048];
-	const char *err_descr;
+log_write_err_fd(uintptr_t fd, const char *fname, int line, int error, const char *descr) {
+	char buf[16384];
+	const char *err_descr, *empty = "";
 	size_t nsize;
 	time_t timel;
-	struct tm *tml;
+	struct tm tml;
 
-	if (-1 == fd || 0 == error)
+	if ((uintptr_t)-1 == fd || 0 == error)
 		return;
-	
-	if (NULL == descr)
-		descr = "";
+	if (NULL == descr) {
+		descr = empty;
+	}
 	err_descr = strerror(error);
-	if (NULL == err_descr)
-		err_descr = "";
-
+	if (NULL == err_descr) {
+		err_descr = empty;
+	}
 	timel = time(NULL);
-	tml = localtime(&timel);
-	if (NULL != fname)
-		nsize = snprintf(buf, sizeof(buf), "[%04i-%02i-%02i %02i:%02i:%02i] "
-		    "%s, line %i: %s error %i: %s\r\n", (tml->tm_year + 1900), 
-		    (tml->tm_mon + 1), tml->tm_mday, tml->tm_hour, tml->tm_min,
-		    tml->tm_sec, fname, line, descr, error, err_descr);
-	else
-		nsize = snprintf(buf, sizeof(buf), "[%04i-%02i-%02i %02i:%02i:%02i]: "
-		    "%s error %i: %s\r\n", (tml->tm_year + 1900), (tml->tm_mon + 1),
-		    tml->tm_mday, tml->tm_hour, tml->tm_min, tml->tm_sec, descr,
-		    error, err_descr);
+	localtime_r(&timel, &tml);
+	if (NULL != fname) {
+		nsize = (size_t)snprintf(buf, sizeof(buf), "[%04i-%02i-%02i %02i:%02i:%02i] "
+		    "%s, line %i: %s error %i: %s\r\n",
+		    (tml.tm_year + 1900), (tml.tm_mon + 1), tml.tm_mday,
+		    tml.tm_hour, tml.tm_min, tml.tm_sec,
+		    fname, line, descr, error, err_descr);
+	} else {
+		nsize = (size_t)snprintf(buf, sizeof(buf), "[%04i-%02i-%02i %02i:%02i:%02i]: "
+		    "%s error %i: %s\r\n",
+		    (tml.tm_year + 1900), (tml.tm_mon + 1), tml.tm_mday,
+		    tml.tm_hour, tml.tm_min, tml.tm_sec,
+		    descr, error, err_descr);
+	}
 	log_write_fd(fd, buf, nsize);
 }
 
 void
-log_write_err_fmt_fd(int fd, const char *fname, int line, int error,
+log_write_err_fmt_fd(uintptr_t fd, const char *fname, int line, int error,
     const char *fmt, ...) {
 	char buf[16384];
-	const char *err_descr;
+	const char *err_descr, *empty = "";
 	size_t nsize;
 	time_t timel;
-	struct tm *tml;
+	struct tm tml;
 	va_list ap;
 
-	if (-1 == fd || 0 == error || NULL == fmt)
+	if ((uintptr_t)-1 == fd || 0 == error || NULL == fmt)
 		return;
-	
 	err_descr = strerror(error);
-	if (NULL == err_descr)
-		err_descr = "";
-
+	if (NULL == err_descr) {
+		err_descr = empty;
+	}
 	timel = time(NULL);
-	tml = localtime(&timel);
-	if (NULL != fname)
-		nsize = snprintf(buf, sizeof(buf), "[%04i-%02i-%02i %02i:%02i:%02i] "
-		    "%s, line %i: error %i: %s ", (tml->tm_year + 1900),
-		    (tml->tm_mon + 1), tml->tm_mday, tml->tm_hour, tml->tm_min,
-		    tml->tm_sec, fname, line, error, err_descr);
-	else
-		nsize = snprintf(buf, sizeof(buf), "[%04i-%02i-%02i %02i:%02i:%02i]: "
-		    "error %i: %s ", (tml->tm_year + 1900), (tml->tm_mon + 1),
-		    tml->tm_mday, tml->tm_hour, tml->tm_min, tml->tm_sec, error,
-		    err_descr);
-
+	localtime_r(&timel, &tml);
+	if (NULL != fname) {
+		nsize = (size_t)snprintf(buf, sizeof(buf), "[%04i-%02i-%02i %02i:%02i:%02i] "
+		    "%s, line %i: error %i: %s ",
+		    (tml.tm_year + 1900), (tml.tm_mon + 1), tml.tm_mday,
+		    tml.tm_hour, tml.tm_min, tml.tm_sec,
+		    fname, line, error, err_descr);
+	} else {
+		nsize = (size_t)snprintf(buf, sizeof(buf), "[%04i-%02i-%02i %02i:%02i:%02i]: "
+		    "error %i: %s ",
+		    (tml.tm_year + 1900), (tml.tm_mon + 1), tml.tm_mday,
+		    tml.tm_hour, tml.tm_min, tml.tm_sec,
+		    error, err_descr);
+	}
 	va_start(ap, fmt);
-	nsize += vsnprintf((buf + nsize), ((sizeof(buf) - 4) - nsize), fmt, ap);
+	nsize += (size_t)vsnprintf((buf + nsize), ((sizeof(buf) - 4) - nsize), fmt, ap);
+	va_end(ap);
 	nsize = min(nsize, (sizeof(buf) - 4));
 	buf[nsize] = 0;
-	va_end(ap);
-	nsize += snprintf((buf + nsize), (sizeof(buf) - nsize), "\r\n");
+	nsize += (size_t)snprintf((buf + nsize), (sizeof(buf) - nsize), "\r\n");
 
 	log_write_fd(fd, buf, nsize);
 }
 
 void
-log_write_ev_fd(int fd, const char *fname, int line, const char *descr) {
-	char buf[2048];
+log_write_ev_fd(uintptr_t fd, const char *fname, int line, const char *descr) {
+	char buf[16384];
+	const char *empty = "";
 	size_t nsize;
 	time_t timel;
-	struct tm *tml;
+	struct tm tml;
 
-	if (-1 == fd)
+	if ((uintptr_t)-1 == fd)
 		return;
-	
-	if (NULL == descr)
-		descr = "";
-
+	if (NULL == descr) {
+		descr = empty;
+	}
 	timel = time(NULL);
-	tml = localtime(&timel);
-	if (NULL != fname)
-		nsize = snprintf(buf, sizeof(buf), "[%04i-%02i-%02i %02i:%02i:%02i] "
-		    "%s, line %i: %s\r\n", (tml->tm_year + 1900), (tml->tm_mon + 1),
-		    tml->tm_mday, tml->tm_hour, tml->tm_min, tml->tm_sec, fname,
-		    line, descr);
-	else
-		nsize = snprintf(buf, sizeof(buf), "[%04i-%02i-%02i %02i:%02i:%02i]: "
-		    "%s\r\n", (tml->tm_year + 1900), (tml->tm_mon + 1), tml->tm_mday,
-		    tml->tm_hour, tml->tm_min, tml->tm_sec, descr);
+	localtime_r(&timel, &tml);
+	if (NULL != fname) {
+		nsize = (size_t)snprintf(buf, sizeof(buf), "[%04i-%02i-%02i %02i:%02i:%02i] "
+		    "%s, line %i: %s\r\n",
+		    (tml.tm_year + 1900), (tml.tm_mon + 1), tml.tm_mday,
+		    tml.tm_hour, tml.tm_min, tml.tm_sec,
+		    fname, line, descr);
+	} else {
+		nsize = (size_t)snprintf(buf, sizeof(buf), "[%04i-%02i-%02i %02i:%02i:%02i]: "
+		    "%s\r\n",
+		    (tml.tm_year + 1900), (tml.tm_mon + 1), tml.tm_mday,
+		    tml.tm_hour, tml.tm_min, tml.tm_sec, descr);
+	}
 	log_write_fd(fd, buf, nsize);
 }
 
 void
-log_write_ev_fmt_fd(int fd, const char *fname, int line, const char *fmt, ...) {
+log_write_ev_fmt_fd(uintptr_t fd, const char *fname, int line, const char *fmt, ...) {
 	char buf[16384];
 	size_t nsize;
 	time_t timel;
-	struct tm *tml;
+	struct tm tml;
 	va_list ap;
 
-	if (-1 == fd || NULL == fmt)
+	if ((uintptr_t)-1 == fd || NULL == fmt)
 		return;
-
 	timel = time(NULL);
-	tml = localtime(&timel);
-	if (NULL != fname)
-		nsize = snprintf(buf, sizeof(buf), "[%04i-%02i-%02i %02i:%02i:%02i] "
-		    "%s, line %i: ", (tml->tm_year + 1900), (tml->tm_mon + 1),
-		    tml->tm_mday, tml->tm_hour, tml->tm_min, tml->tm_sec, fname,
-		    line);
-	else
-		nsize = snprintf(buf, sizeof(buf), "[%04i-%02i-%02i %02i:%02i:%02i]: ",
-		    (tml->tm_year + 1900), (tml->tm_mon + 1), tml->tm_mday,
-		    tml->tm_hour, tml->tm_min, tml->tm_sec);
-
+	localtime_r(&timel, &tml);
+	if (NULL != fname) {
+		nsize = (size_t)snprintf(buf, sizeof(buf), "[%04i-%02i-%02i %02i:%02i:%02i] "
+		    "%s, line %i: ",
+		    (tml.tm_year + 1900), (tml.tm_mon + 1), tml.tm_mday,
+		    tml.tm_hour, tml.tm_min, tml.tm_sec,
+		    fname, line);
+	} else {
+		nsize = (size_t)snprintf(buf, sizeof(buf), "[%04i-%02i-%02i %02i:%02i:%02i]: ",
+		    (tml.tm_year + 1900), (tml.tm_mon + 1), tml.tm_mday,
+		    tml.tm_hour, tml.tm_min, tml.tm_sec);
+	}
 	va_start(ap, fmt);
-	nsize += vsnprintf((buf + nsize), ((sizeof(buf) - 4) - nsize), fmt, ap);
+	nsize += (size_t)vsnprintf((buf + nsize), ((sizeof(buf) - 4) - nsize), fmt, ap);
 	va_end(ap);
 	nsize = min(nsize, (sizeof(buf) - 4));
 	buf[nsize] = 0;
-	nsize += snprintf((buf + nsize), (sizeof(buf) - nsize), "\r\n");
+	nsize += (size_t)snprintf((buf + nsize), (sizeof(buf) - nsize), "\r\n");
 
 	log_write_fd(fd, buf, nsize);
 }

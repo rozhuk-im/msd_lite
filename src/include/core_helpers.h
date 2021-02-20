@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2011 - 2014 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2011 - 2015 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,13 +31,12 @@
 #ifndef __CORE_HELPERS_H__
 #define __CORE_HELPERS_H__
 
-static void *(*volatile secure_memset_volatile)(void*, int, size_t) = memset;
-#define secure_bzero(mem, size)	secure_memset_volatile(mem, 0, size)
+#include <pwd.h>
+#include <grp.h>
+#include <signal.h>
 
 
-#define mmalloc(size)	mmalloc_fd((uintptr_t)-1, size)
-void	*mmalloc_fd(uintptr_t fd, size_t size);
-void	mmfree(void *mem, size_t size);
+
 
 
 typedef struct cmd_line_data_s {
@@ -53,6 +52,7 @@ typedef struct cmd_line_data_s {
 
 int	cmd_line_parse(int argc, char **argv, cmd_line_data_p data);
 void	cmd_line_usage(const char *pkg_name, const char *pkg_ver);
+void	signal_install(sig_t func);
 void	make_daemon(void);
 int	write_pid(const char *file_name);
 int	set_user_and_group(uid_t pw_uid, gid_t pw_gid);
@@ -62,7 +62,10 @@ int	read_file_buf(const char *file_name, size_t file_name_size, uint8_t *buf,
 	    size_t buf_size, size_t *buf_size_ret);
 int	get_cpu_count(void);
 int	bind_thread_to_cpu(int cpu_id);
-int	fd_set_nonblocking(int fd, int nonblocked);
+int	fd_set_nonblocking(uintptr_t fd, int nonblocked);
+#if defined(__FreeBSD__) && __FreeBSD__ < 10 /* __FreeBSD__ specific code. */
+int	pipe2(int fildes[2], int flags);
+#endif /* __FreeBSD__ specific code. */
 
 
 size_t	calc_sptab_count(const char *buf, size_t buf_size);
@@ -80,12 +83,18 @@ uint8_t	data_xor8(void *buf, size_t size);
 void	memxor(void *dst, uint8_t byte, size_t size);
 void	memxorbuf(void *dst, size_t dsize, void *src, size_t ssize);
 
-int	cvt_hex2bin(uint8_t *hex, size_t hex_size, int auto_out_size,
+int	cvt_hex2bin(const uint8_t *hex, size_t hex_size, int auto_out_size,
 	    uint8_t *bin, size_t bin_size, size_t *bin_size_ret);
-int	cvt_bin2hex(uint8_t *bin, size_t bin_size, int auto_hex_size,
+int	cvt_bin2hex(const uint8_t *bin, size_t bin_size, int auto_hex_size,
 	    uint8_t *hex, size_t hex_size, size_t *hex_size_ret);
 
-int	yn_set_flag32(uint8_t *buf, size_t buf_size, uint32_t flag_bit,
+int	yn_set_flag32(const uint8_t *buf, size_t buf_size, uint32_t flag_bit,
 	    uint32_t *flags);
+
+#ifdef SYS_RES_XML_CONFIG
+void	sys_res_limits_load_xml_apply(const uint8_t *buf, size_t buf_size);
+#endif
+
+
 
 #endif /* __CORE_HELPERS_H__ */

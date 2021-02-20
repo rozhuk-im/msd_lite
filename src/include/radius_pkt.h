@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2014 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -60,7 +60,10 @@
 #	include <sys/types.h>
 #	include <inttypes.h>
 #	include <string.h> /* bcopy, bzero, memcpy, memmove, memset, strnlen, strerror... */
+#	include <sys/socket.h>
 #	include <netinet/in.h> /* ntohs(), htons() */
+#	include <netinet/tcp.h>
+#	include <arpa/inet.h>
 #	ifndef ENOATTR
 #		define ENOATTR	ENODATA
 #	endif
@@ -607,8 +610,10 @@ radius_sec_memcmp(uint8_t const *a, uint8_t const *b, size_t size) {
 	register int res = 0;
 	register size_t i;
 
-	for (i = 0; i < size; i ++)
+	for (i = 0; i < size; i ++) {
 		res |= a[i] ^ b[i];
+	}
+
 	return (res);
 }
 
@@ -734,7 +739,7 @@ radius_pkt_attr_find_raw(rad_pkt_hdr_p pkt, size_t offset, uint8_t attr_type,
 			if (NULL != attr_ret)
 				(*attr_ret) = attr;
 			if (NULL != offset_ret)
-				(*offset_ret) = (((uint8_t*)attr) - ((uint8_t*)pkt));
+				(*offset_ret) = (size_t)(((uint8_t*)attr) - ((uint8_t*)pkt));
 			return (0);
 		}
 		attr_cnt -= attr->len;
@@ -763,7 +768,7 @@ radius_pkt_attr_password_encode(uint8_t *authenticator,
 	/* Calc result size. */
 	if (0 != password_len) {
 		password_len_aligned = (password_len + (MD5_HASH_SIZE - 1));
-		password_len_aligned &= ~(MD5_HASH_SIZE - 1);
+		password_len_aligned &= ~((size_t)(MD5_HASH_SIZE - 1));
 	} else {
 		password_len_aligned = MD5_HASH_SIZE;
 	}
@@ -781,17 +786,18 @@ radius_pkt_attr_password_encode(uint8_t *authenticator,
 	/* Init md5 context. */
 	md5_init(&ctx);
 	md5_update(&ctx, key, key_len); /* key */
-	memcpy(&ctx_with_key, &ctx, sizeof(md5_ctx_t)); /* Save context with key. */
+	memcpy(&ctx_with_key, &ctx, sizeof(ctx_with_key)); /* Save context with key. */
 	/* First block. */
 	md5_update(&ctx, authenticator, MD5_HASH_SIZE); /* authenticator */
 	/* Finish first and process other blocks. */
 	for (j = 0;; j += MD5_HASH_SIZE) {
 		md5_final(&ctx, digest);
-		for (i = 0; i < MD5_HASH_SIZE; i ++)
+		for (i = 0; i < MD5_HASH_SIZE; i ++) {
 			buf[(j + i)] ^= digest[i];
+		}
 		if ((j + MD5_HASH_SIZE) >= password_len_aligned)
 			break;
-		memcpy(&ctx, &ctx_with_key, sizeof(md5_ctx_t));
+		memcpy(&ctx, &ctx_with_key, sizeof(ctx));
 		md5_update(&ctx, (buf + j), MD5_HASH_SIZE);
 	}
 	return (0);
@@ -824,18 +830,19 @@ radius_pkt_attr_password_decode(uint8_t *authenticator,
 	/* Init md5 context. */
 	md5_init(&ctx);
 	md5_update(&ctx, key, key_len); /* key */
-	memcpy(&ctx_with_key, &ctx, sizeof(md5_ctx_t)); /* Save context with key. */
+	memcpy(&ctx_with_key, &ctx, sizeof(ctx_with_key)); /* Save context with key. */
 	/* First block. */
 	md5_update(&ctx, authenticator, MD5_HASH_SIZE); /* authenticator */
 	/* Finish first and process other blocks. */
 	for (j = 0; j < enc_password_len; j += MD5_HASH_SIZE) {
 		md5_final(&ctx, digest);
 		if ((j + MD5_HASH_SIZE) < enc_password_len) {
-			memcpy(&ctx, &ctx_with_key, sizeof(md5_ctx_t));
+			memcpy(&ctx, &ctx_with_key, sizeof(ctx));
 			md5_update(&ctx, (buf + j), MD5_HASH_SIZE);
 		}
-		for (i = 0; i < MD5_HASH_SIZE; i ++)
+		for (i = 0; i < MD5_HASH_SIZE; i ++) {
 			buf[(j + i)] ^= digest[i];
+		}
 	}
 	if (NULL != buf_size_ret)
 		(*buf_size_ret) = strnlen((const char*)buf, enc_password_len);
@@ -867,6 +874,7 @@ radius_pkt_attr_msg_authenticator_calc(rad_pkt_hdr_p pkt, rad_pkt_attr_p attr,
 	/* Process authenticator. */
 	if (0 != pkt_authenticator_inside)
 		goto authenticator_inside;
+
 	switch (pkt->code) {
 	case RADIUS_PKT_TYPE_ACCESS_REQUEST:
 	case RADIUS_PKT_TYPE_STATUS_SERVER:
@@ -902,17 +910,16 @@ handle_ack:
 		break;
 	default:
 		return (EBADMSG);
-		break;
 	}
 	/* Process attr. */
 	/* Attrs before message authenticator and attr header. */
 	hmac_md5_update(&hctx, (uint8_t*)RADIUS_PKT_ATTRS(pkt),
-	    (msg_authr_data - ((uint8_t*)RADIUS_PKT_ATTRS(pkt))));
+	    (size_t)(msg_authr_data - ((uint8_t*)RADIUS_PKT_ATTRS(pkt))));
 	/* Message authenticator data = zeroes. */
 	hmac_md5_update(&hctx, msg_authenticator, MD5_HASH_SIZE);
 	/* Attrs after msg authenticator. */
 	hmac_md5_update(&hctx, (msg_authr_data + MD5_HASH_SIZE),
-	    (RADIUS_PKT_END(pkt) - (msg_authr_data + MD5_HASH_SIZE)));
+	    (size_t)(RADIUS_PKT_END(pkt) - (msg_authr_data + MD5_HASH_SIZE)));
 	/* All done! */
 	hmac_md5_final(&hctx, msg_authenticator);
 	return (0);
@@ -996,7 +1003,7 @@ radius_pkt_attr_alloc_raw(rad_pkt_hdr_p pkt, size_t pkt_buf_size, size_t *pkt_si
 	if (NULL != attr_ret)
 		(*attr_ret) = attr;
 	if (NULL != offset_ret)
-		(*offset_ret) = (((uint8_t*)attr) - ((uint8_t*)pkt));
+		(*offset_ret) = (size_t)(((uint8_t*)attr) - ((uint8_t*)pkt));
 	return (0);
 }
 static inline int
@@ -1054,14 +1061,13 @@ radius_pkt_attr_add(rad_pkt_hdr_p pkt, size_t pkt_buf_size, size_t *pkt_size_ret
 			return (error);
 		/* Add attribute with empty data. */
 		error = radius_pkt_attr_alloc_raw(pkt, pkt_buf_size, pkt_size_ret,
-		    type, tm, &attr, offset_ret);
+		    type, (uint8_t)tm, &attr, offset_ret);
 		if (0 != error)
 			return (error);
 		/* Encode password to attribute data - late, on pkt sign. */
 		memcpy(RADIUS_PKT_ATTR_DATA(attr), data, len);
 		memset((RADIUS_PKT_ATTR_DATA(attr) + len), 0, (tm - len));
 		return (0);
-		break;
 	case RADIUS_ATTR_TYPE_MSG_AUTHENTIC:
 		//return (ECANCELED); /* Allow or not allow to add this attribute, - thats is the question! */
 		/* Is allready added? */
@@ -1078,7 +1084,6 @@ radius_pkt_attr_add(rad_pkt_hdr_p pkt, size_t pkt_buf_size, size_t *pkt_size_ret
 			return (error);
 		memset(RADIUS_PKT_ATTR_DATA(attr), 0, MD5_HASH_SIZE);
 		return (0);
-		break;
 	}
 
 	/* Other types standart processing. */
@@ -1164,12 +1169,10 @@ radius_pkt_attr_add_port(rad_pkt_hdr_p pkt, size_t pkt_buf_size, size_t *pkt_siz
 		return (radius_pkt_attr_add(pkt, pkt_buf_size, pkt_size_ret,
 		    type, 4, (uint8_t*)&((struct sockaddr_in*)addr)->sin_port,
 		    offset_ret));
-		break;
 	case AF_INET6:
 		return (radius_pkt_attr_add(pkt, pkt_buf_size, pkt_size_ret,
 		    type, 4, (uint8_t*)&((struct sockaddr_in6*)addr)->sin6_port,
 		    offset_ret));
-		break;
 	}
 	return (EINVAL);
 }
@@ -1186,13 +1189,11 @@ radius_pkt_attr_add_addr(rad_pkt_hdr_p pkt, size_t pkt_buf_size, size_t *pkt_siz
 		    type_v4, sizeof(struct sockaddr_in),
 		    (uint8_t*)&((struct sockaddr_in*)addr)->sin_addr,
 		    offset_ret));
-		break;
 	case AF_INET6:
 		return (radius_pkt_attr_add(pkt, pkt_buf_size, pkt_size_ret,
 		    type_v6, sizeof(struct sockaddr_in6),
 		    (uint8_t*)&((struct sockaddr_in6*)addr)->sin6_addr,
 		    offset_ret));
-		break;
 	}
 	return (EINVAL);
 }
@@ -1358,7 +1359,6 @@ radius_pkt_authenticator_calc(rad_pkt_hdr_p pkt, uint8_t *key, size_t key_len,
 		/* The authenticator is random, cant calc. */
 		memcpy(authenticator, pkt->authenticator, MD5_HASH_SIZE);
 		return (0);
-		break;
 	}
 	if (0 != pkt_authenticator_inside) {
 		/* MD5(packet + secret); */
@@ -1404,7 +1404,6 @@ radius_pkt_authenticator_calc(rad_pkt_hdr_p pkt, uint8_t *key, size_t key_len,
 		break;
 	default:
 		return (EINVAL);
-		break;
 	}
 	return (0);
 }
@@ -1416,13 +1415,12 @@ radius_pkt_authenticator_chk(rad_pkt_hdr_p pkt, uint8_t *key, size_t key_len,
 
 	if (NULL == pkt)
 		return (EINVAL);
-	/* Skeep check for types with random data in authenticator. */
+	/* Skip check for types with random data in authenticator. */
 	switch (pkt->code) {
 	case RADIUS_PKT_TYPE_ACCESS_REQUEST:
 	case RADIUS_PKT_TYPE_STATUS_SERVER:
 	case RADIUS_PKT_TYPE_STATUS_CLIENT:
 		return (0);
-		break;
 	}
 	if (0 != radius_pkt_authenticator_calc(pkt, key, key_len,
 	    pkt_authenticator_inside, pkt_req, (uint8_t*)calc_authr))
@@ -1445,7 +1443,6 @@ radius_pkt_authenticator_update(rad_pkt_hdr_p pkt, uint8_t *key, size_t key_len,
 	case RADIUS_PKT_TYPE_STATUS_CLIENT:
 		/* MUST BEEN SET BEFORE! */
 		return (0);
-		break;
 	}
 	return (radius_pkt_authenticator_calc(pkt, key, key_len,
 	    pkt_authenticator_inside, pkt_req, (uint8_t*)pkt->authenticator));
@@ -1494,7 +1491,6 @@ handle_ack:
 		break;
 	default:
 		return (EINVAL);
-		break;
 	}
 	pkt->code = code;
 	pkt->id = id;

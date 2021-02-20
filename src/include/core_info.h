@@ -38,7 +38,8 @@
 #endif
 
 
-int	sysctl_str_to_buf(int *mib, u_int mib_cnt, const char *descr, size_t descr_size,
+int	sysctl_str_to_buf(int *mib, uint32_t mib_cnt,
+	    const char *descr, size_t descr_size,
 	    uint8_t *buf, size_t buf_size, size_t *buf_size_ret);
 int	core_info_get_os_ver(const char *separator, size_t separator_size,
 	    char *buf, size_t buf_size, size_t *buf_size_ret);
@@ -59,4 +60,4 @@ int	core_info_limits(uint8_t *buf, size_t buf_size, size_t *buf_size_ret);
 int	core_info_sysinfo(uint8_t *buf, size_t buf_size, size_t *buf_size_ret);
 
 
-#endif // __CORE_INFO_H__
+#endif /* __CORE_INFO_H__ */

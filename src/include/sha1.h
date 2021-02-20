@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003 - 2014 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2003 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -60,28 +60,30 @@
  *      a multiple of the size of an 8-bit character.
  */
 
-#ifndef AFX__SHA1_H__INCLUDED_
-#define AFX__SHA1_H__INCLUDED_
-
-#if _MSC_VER > 1000
-#	pragma once
-#endif // _MSC_VER > 1000
+#ifndef __SHA1_H__INCLUDED__
+#define __SHA1_H__INCLUDED__
 
 
 #ifndef _WINDOWS
 #	include <sys/param.h>
-#	ifndef BSD
+#	ifdef __linux__ /* Linux specific code. */
 #		define _GNU_SOURCE /* See feature_test_macros(7) */
 #		define __USE_GNU 1
-#	endif
+#		include <endian.h>
+#	else
+#		include <sys/endian.h>
+#	endif /* Linux specific code. */
 #	include <sys/types.h>
 #	include <string.h> /* bcopy, bzero, memcpy, memmove, memset, strerror... */
 #	include <inttypes.h>
+	static void *(*volatile sha1_memset_volatile)(void*, int, size_t) = memset;
+#	define sha1_bzero(__mem, __size)	sha1_memset_volatile((__mem), 0x00, (__size))
 #else
 #	define uint8_t		unsigned char
 #	define uint32_t		DWORD
 #	define uint64_t		DWORDLONG
 #	define size_t		SIZE_T
+#	define sha1_bzero(__mem, __size)	SecureZeroMemory((__mem), (__size))
 #endif
 
 #if defined(_WINDOWS) && defined(UNICODE)
@@ -95,22 +97,12 @@
 #endif
 
 
-#ifndef SHA1_MAX_SPEED /* Max speed is insecure mode! */
-#	ifdef SecureZeroMemory /* Windows version. */
-#		define sha1_bzero(mem, size)	SecureZeroMemory(mem, size)
-#	else
-		static void *(*volatile sha1_memset_volatile)(void *, int, size_t) = memset;
-#		define sha1_bzero(mem, size)	sha1_memset_volatile(mem, 0, size)
-#	endif
-#else
-#	define sha1_bzero(mem, size)
-#endif
-
-
-#define SHA1_HASH_SIZE		20
+/* HASH constants. */
+#define SHA1_HASH_SIZE		20 /* 160 bit */
 #define SHA1_HASH_STR_SIZE	(SHA1_HASH_SIZE * 2)
-#define SHA1_MSG_BLK_SIZE	64
+#define SHA1_MSG_BLK_SIZE	64 /* 512 bit */
 #define SHA1_MSG_BLK_SIZE_MASK	(SHA1_MSG_BLK_SIZE - 1)
+#define SHA1_MSG_BLK_64CNT	(SHA1_MSG_BLK_SIZE / sizeof(uint64_t)) /* 16 */
 
 
 /* Define the SHA1 circular left shift macro. */
@@ -127,34 +119,26 @@
 #define SHA1_Parity(x, y, z)	((x) ^ (y) ^ (z))
 
 
-/* Initial Hash Values: magic initialization constants. */
-static const uint32_t SHA1_160_H0[(SHA1_HASH_SIZE / sizeof(uint32_t))] = {
-	0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476,
-	0xc3d2e1f0
-};
-
-
 /* This structure will hold context information for the SHA-1 hashing operation. */
 typedef struct sha1_ctx_s {
 	uint32_t hash[(SHA1_HASH_SIZE / sizeof(uint32_t))]; /* State (ABCDE) / Message Digest. */
 	uint64_t count; /* Number of bits, modulo 2^64 (lsb first). */
-	uint8_t buffer[SHA1_MSG_BLK_SIZE]; /* Input buffer: 512-bit message blocks. */
+	uint64_t buffer[SHA1_MSG_BLK_64CNT]; /* Input buffer: 512-bit message blocks. */
 	uint32_t W[80]; /* Temp buf for sha1_transform(). */
 } sha1_ctx_t, *sha1_ctx_p;
 
 typedef struct hmac_sha1_ctx_s {
 	sha1_ctx_t ctx;
-	uint64_t k_opad[(SHA1_MSG_BLK_SIZE / sizeof(uint64_t))]; /* outer padding - key XORd with opad. */
+	uint64_t k_opad[SHA1_MSG_BLK_64CNT]; /* outer padding - key XORd with opad. */
 } hmac_sha1_ctx_t, *hmac_sha1_ctx_p;
 
 
 
 static inline void
-sha1_memcpy_bswap(uint8_t *dst, uint8_t *src, size_t size) {
+sha1_memcpy_bswap(uint8_t *dst, const uint8_t *src, size_t size) {
 	register size_t i;
 
-	//for (i = 0; i < size; i ++)
-	//	dst[i] = src[((i & ~3) + (3 - (i & 0x03)))]; /* bswap()/htonl() */
+#pragma unroll
 	for (i = 0; i < size; i += 4) {
 		dst[(i + 0)] = src[(i + 3)];
 		dst[(i + 1)] = src[(i + 2)];
@@ -176,8 +160,12 @@ sha1_memcpy_bswap(uint8_t *dst, uint8_t *src, size_t size) {
  */
 static inline void
 sha1_init(sha1_ctx_p ctx) {
-	/* Load magic initialization constants. */
-	memcpy(&ctx->hash, SHA1_160_H0, sizeof(SHA1_160_H0));
+	/* Initial Hash Values: magic initialization constants. */
+	ctx->hash[0] = 0x67452301;
+	ctx->hash[1] = 0xefcdab89;
+	ctx->hash[2] = 0x98badcfe;
+	ctx->hash[3] = 0x10325476;
+	ctx->hash[4] = 0xc3d2e1f0;
 	ctx->count = 0;
 }
 
@@ -197,7 +185,7 @@ sha1_init(sha1_ctx_p ctx) {
  *      names used in the publication.
  */
 static inline void
-sha1_transform(sha1_ctx_p ctx, uint8_t *block) {
+sha1_transform(sha1_ctx_p ctx, const uint8_t *block) {
 	/* Constants defined in SHA-1. */
 	const uint32_t K[] = {0x5a827999, 0x6ed9eba1, 0x8f1bbcdc, 0xca62c1d6};
 	register uint32_t t; /* Loop counter. */
@@ -215,9 +203,12 @@ sha1_transform(sha1_ctx_p ctx, uint8_t *block) {
 	/* Initialize the first 16 words in the array W */
 	sha1_memcpy_bswap((uint8_t*)W, block, SHA1_MSG_BLK_SIZE);
 
-	for (t = 16; t < 80; t ++)
+#pragma unroll
+	for (t = 16; t < 80; t ++) {
 		W[t] = SHA1_ROTL(1, W[(t - 3)] ^ W[(t - 8)] ^ W[(t - 14)] ^ W[(t - 16)]);
+	}
 
+#pragma unroll
 	for (t = 0; t < 20; t ++) {
 		temp = SHA1_ROTL(5, A) + SHA1_Ch(B, C, D) + E + W[t] + K[0];
 		E = D;
@@ -227,6 +218,7 @@ sha1_transform(sha1_ctx_p ctx, uint8_t *block) {
 		A = temp;
 	}
 
+#pragma unroll
 	for (t = 20; t < 40; t ++) {
 		temp = SHA1_ROTL(5, A) + SHA1_Parity(B, C, D) + E + W[t] + K[1];
 		E = D;
@@ -236,6 +228,7 @@ sha1_transform(sha1_ctx_p ctx, uint8_t *block) {
 		A = temp;
 	}
 
+#pragma unroll
 	for (t = 40; t < 60; t ++) {
 		temp = SHA1_ROTL(5, A) + SHA1_Maj(B, C, D) + E + W[t] + K[2];
 		E = D;
@@ -245,6 +238,7 @@ sha1_transform(sha1_ctx_p ctx, uint8_t *block) {
 		A = temp;
 	}
 
+#pragma unroll
 	for (t = 60; t < 80; t ++) {
 		temp = SHA1_ROTL(5, A) + SHA1_Parity(B, C, D) + E + W[t] + K[3];
 		E = D;
@@ -278,33 +272,34 @@ sha1_transform(sha1_ctx_p ctx, uint8_t *block) {
  *          The length of the message in message_array
  */
 static inline void
-sha1_update(sha1_ctx_p ctx, uint8_t *data, size_t data_size) {
-	register size_t i;
-	uint32_t index, part_size;
+sha1_update(sha1_ctx_p ctx, const uint8_t *data, size_t data_size) {
+	size_t i, index, part_size;
 
 	if (0 == data_size)
 		return;
 	/* Compute number of bytes mod 64. */
-	index = ((ctx->count >> 3) & SHA1_MSG_BLK_SIZE_MASK);
+	index = (ctx->count & SHA1_MSG_BLK_SIZE_MASK);
 	part_size = (SHA1_MSG_BLK_SIZE - index);
 	/* Update number of bits. */
-	ctx->count += (((uint64_t)data_size) << 3);
+	ctx->count += data_size;
 	/* Transform as many times as possible. */
 	if (data_size >= part_size) {
 		if (0 != index) { /* Add data to buffer and process it. */
-			memcpy(&ctx->buffer[index], data, part_size);
-			sha1_transform(ctx, ctx->buffer);
+			memcpy((((uint8_t*)ctx->buffer) + index), data, part_size);
+			index = 0;
+			sha1_transform(ctx, (uint8_t*)ctx->buffer);
 		} else { /* Proccess all data in loop.  */
 			part_size = 0;
 		}
-		for (i = part_size; (i + SHA1_MSG_BLK_SIZE_MASK) < data_size; i += SHA1_MSG_BLK_SIZE)
-			sha1_transform(ctx, &data[i]);
-		index = 0;
+		for (i = part_size; (i + SHA1_MSG_BLK_SIZE_MASK) < data_size;
+		    i += SHA1_MSG_BLK_SIZE) {
+			sha1_transform(ctx, (data + i));
+		}
 	} else {
 		i = 0;
 	}
 	/* Buffer remaining data. */
-	memcpy(&ctx->buffer[index], &data[i], (data_size - i));
+	memcpy((((uint8_t*)ctx->buffer) + index), (data + i), (data_size - i));
 }
 
 /*
@@ -332,21 +327,22 @@ sha1_update(sha1_ctx_p ctx, uint8_t *data, size_t data_size) {
  */
 static inline void
 sha1_final(sha1_ctx_p ctx, uint8_t *digest) {
-	uint32_t index;
+	size_t index;
 
 	/* Compute number of bytes mod 64. */
-	index = ((ctx->count >> 3) & SHA1_MSG_BLK_SIZE_MASK);
-	ctx->buffer[index ++] = 0x80; /* Padding... */
-	if (56 < index) { /* Not enouth space for message length (8 bytes). */
-		memset(&ctx->buffer[index], 0, (SHA1_MSG_BLK_SIZE - index));
-		sha1_transform(ctx, ctx->buffer);
+	index = (ctx->count & SHA1_MSG_BLK_SIZE_MASK);
+	((uint8_t*)ctx->buffer)[index ++] = 0x80; /* Padding... */
+	if ((SHA1_MSG_BLK_SIZE - 8) < index) { /* Not enouth space for message length (8 bytes). */
+		memset((((uint8_t*)ctx->buffer) + index), 0x00,
+		    (SHA1_MSG_BLK_SIZE - index));
+		sha1_transform(ctx, (uint8_t*)ctx->buffer);
 		index = 0;
 	}
-	memset(&ctx->buffer[index], 0, (56 - index));
+	memset((((uint8_t*)ctx->buffer) + index), 0x00,
+	    ((SHA1_MSG_BLK_SIZE - 8) - index));
 	/* Store the message length as the last 8 octets. */
-	sha1_memcpy_bswap(&ctx->buffer[56], (((uint8_t*)&ctx->count) + 4), 4);
-	sha1_memcpy_bswap(&ctx->buffer[60], (uint8_t*)&ctx->count, 4);
-	sha1_transform(ctx, ctx->buffer);
+	ctx->buffer[(SHA1_MSG_BLK_64CNT - 1)] = bswap64((ctx->count << 3));
+	sha1_transform(ctx, (uint8_t*)ctx->buffer);
 	/* Store state in digest. */
 	sha1_memcpy_bswap(digest, (uint8_t*)ctx->hash, SHA1_HASH_SIZE);
 	/* Zeroize sensitive information. */
@@ -373,37 +369,38 @@ sha1_final(sha1_ctx_p ctx, uint8_t *digest) {
  * digest - caller digest to be filled in
  */
 static inline void
-hmac_sha1_init(uint8_t *key, size_t key_len, hmac_sha1_ctx_p hctx) {
-	size_t i;
-	uint64_t k_ipad[(SHA1_MSG_BLK_SIZE / sizeof(uint64_t))]; /* inner padding - key XORd with ipad. */
+hmac_sha1_init(const uint8_t *key, size_t key_len, hmac_sha1_ctx_p hctx) {
+	register size_t i;
+	uint64_t k_ipad[SHA1_MSG_BLK_64CNT]; /* inner padding - key XORd with ipad. */
 
 	/* Start out by storing key in pads. */
 	/* If key is longer than block_size bytes reset it to key = SHA1(key). */
 	sha1_init(&hctx->ctx); /* Init context for 1st pass / Get hash params. */
-	if (key_len > SHA1_MSG_BLK_SIZE) {
+	if (SHA1_MSG_BLK_SIZE < key_len) {
 		sha1_update(&hctx->ctx, key, key_len);
 		key_len = SHA1_HASH_SIZE;
-		sha1_final(&hctx->ctx, (uint8_t*)&k_ipad);
+		sha1_final(&hctx->ctx, (uint8_t*)k_ipad);
 		sha1_init(&hctx->ctx); /* Reinit context for 1st pass. */
 	} else {
-		memcpy(&k_ipad, key, key_len);
+		memcpy(k_ipad, key, key_len);
 	}
-	memset((((uint8_t*)k_ipad) + key_len), 0, (SHA1_MSG_BLK_SIZE - key_len));
-	memcpy(hctx->k_opad, k_ipad, SHA1_MSG_BLK_SIZE);
+	memset((((uint8_t*)k_ipad) + key_len), 0x00, (SHA1_MSG_BLK_SIZE - key_len));
+	memcpy(hctx->k_opad, k_ipad, sizeof(k_ipad));
 
 	/* XOR key with ipad and opad values. */
-	for (i = 0; i < (SHA1_MSG_BLK_SIZE / sizeof(uint64_t)); i ++) {
-		k_ipad[i] ^= 0x3636363636363636ll;
-		hctx->k_opad[i] ^= 0x5c5c5c5c5c5c5c5cll;
+#pragma unroll
+	for (i = 0; i < SHA1_MSG_BLK_64CNT; i ++) {
+		k_ipad[i] ^= 0x3636363636363636ull;
+		hctx->k_opad[i] ^= 0x5c5c5c5c5c5c5c5cull;
 	}
 	/* Perform inner SHA1. */
-	sha1_update(&hctx->ctx, (uint8_t*)k_ipad, SHA1_MSG_BLK_SIZE); /* Start with inner pad. */
+	sha1_update(&hctx->ctx, (uint8_t*)k_ipad, sizeof(k_ipad)); /* Start with inner pad. */
 	/* Zeroize sensitive information. */
 	sha1_bzero(k_ipad, sizeof(k_ipad));
 }
 
 static inline void
-hmac_sha1_update(hmac_sha1_ctx_p hctx, uint8_t *data, size_t data_size) {
+hmac_sha1_update(hmac_sha1_ctx_p hctx, const uint8_t *data, size_t data_size) {
 
 	sha1_update(&hctx->ctx, data, data_size); /* Then data of datagram. */
 }
@@ -418,14 +415,14 @@ hmac_sha1_final(hmac_sha1_ctx_p hctx, uint8_t *digest) {
 	sha1_update(&hctx->ctx, digest, SHA1_HASH_SIZE); /* Then results of 1st hash. */
 	sha1_final(&hctx->ctx, digest); /* Finish up 2nd pass. */
 	/* Zeroize sensitive information. */
-	sha1_bzero(hctx->k_opad, sizeof(hctx->k_opad));
+	sha1_bzero(hctx->k_opad, SHA1_MSG_BLK_SIZE);
 }
 
 static inline void
-hmac_sha1(uint8_t *key, size_t key_len, uint8_t *data, size_t data_size,
-    uint8_t *digest) {
+hmac_sha1(const uint8_t *key, size_t key_len, const uint8_t *data,
+    size_t data_size, uint8_t *digest) {
 	hmac_sha1_ctx_t hctx;
-	
+
 	hmac_sha1_init(key, key_len, &hctx);
 	hmac_sha1_update(&hctx, data, data_size);
 	hmac_sha1_final(&hctx, digest);
@@ -433,54 +430,58 @@ hmac_sha1(uint8_t *key, size_t key_len, uint8_t *data, size_t data_size,
 
 
 static inline void
-sha1_cvt_hex(uint8_t *bin, uint8_t *hex) {
-	static uint8_t *hex_tbl = (uint8_t*)"0123456789abcdef";
-	register uint8_t *bin_max, byte;
+sha1_cvt_hex(const uint8_t *bin, uint8_t *hex) {
+	static const uint8_t *hex_tbl = (const uint8_t*)"0123456789abcdef";
+	register const uint8_t *bin_max;
+	register uint8_t byte;
 
+#pragma unroll
 	for (bin_max = (bin + SHA1_HASH_SIZE); bin < bin_max; bin ++) {
 		byte = (*bin);
 		(*hex ++) = hex_tbl[((byte >> 4) & 0x0f)];
 		(*hex ++) = hex_tbl[(byte & 0x0f)];
 	}
 	(*hex) = 0;
-};
+}
 
 
 /* Other staff. */
 static inline void
-sha1_cvt_strA(uint8_t *digest, char *digest_str) {
+sha1_cvt_strA(const uint8_t *digest, char *digest_str) {
+
 	sha1_cvt_hex(digest, (uint8_t*)digest_str);
-};
+}
 
 #ifdef _WINDOWS
 static inline void
-sha1_cvt_strW(uint8_t *digest, LPWSTR digest_str) {
+sha1_cvt_strW(const uint8_t *digest, LPWSTR digest_str) {
 	register size_t i, j;
 
-	for (i = 0, j = 0; i < SHA1_HASH_SIZE; i ++, j += 2)
+	for (i = 0, j = 0; i < SHA1_HASH_SIZE; i ++, j += 2) {
 		wsprintfW((LPWSTR)(digest_str + j), L"%02x", digest[i]);
+	}
 	digest_str[j] = 0;
-};
+}
 #endif
 
 
 static inline void
-sha1_get_digest(void *data, size_t data_size, uint8_t *digest) {
+sha1_get_digest(const void *data, size_t data_size, uint8_t *digest) {
 	sha1_ctx_t ctx;
 
 	sha1_init(&ctx);
-	sha1_update(&ctx, (uint8_t*)data, data_size);
+	sha1_update(&ctx, data, data_size);
 	sha1_final(&ctx, digest);
 }
 
 
 static inline void
-sha1_get_digest_strA(char *data, size_t data_size, char *digest_str) {
+sha1_get_digest_strA(const char *data, size_t data_size, char *digest_str) {
 	sha1_ctx_t ctx;
 	uint8_t digest[SHA1_HASH_SIZE];
 
 	sha1_init(&ctx);
-	sha1_update(&ctx, (uint8_t*)data, data_size);
+	sha1_update(&ctx, (const uint8_t*)data, data_size);
 	sha1_final(&ctx, digest);
 
 	sha1_cvt_strA(digest, digest_str);
@@ -488,12 +489,12 @@ sha1_get_digest_strA(char *data, size_t data_size, char *digest_str) {
 
 #ifdef _WINDOWS
 static inline void
-sha1_get_digest_strW(LPWSTR data, size_t data_size, LPWSTR digest_str) {
+sha1_get_digest_strW(const LPWSTR data, size_t data_size, LPWSTR digest_str) {
 	sha1_ctx_t ctx;
 	uint8_t digest[SHA1_HASH_SIZE];
 
 	sha1_init(&ctx);
-	sha1_update(&ctx, (uint8_t*)data, data_size);
+	sha1_update(&ctx, (const uint8_t*)data, data_size);
 	sha1_final(&ctx, digest);
 
 	sha1_cvt_strW(digest, digest_str);
@@ -502,29 +503,31 @@ sha1_get_digest_strW(LPWSTR data, size_t data_size, LPWSTR digest_str) {
 
 
 static inline void
-sha1_hmac_get_digest(void *key, size_t key_size, void *data, size_t data_size,
-    uint8_t *digest) {
+sha1_hmac_get_digest(const void *key, size_t key_size,
+    const void *data, size_t data_size, uint8_t *digest) {
 
-	hmac_sha1((uint8_t*)key, key_size, (uint8_t*)data, data_size, digest);
+	hmac_sha1(key, key_size, data, data_size, digest);
 }
 
 
 static inline void
-sha1_hmac_get_digest_strA(char *key, size_t key_size, char *data, size_t data_size,
-    char *digest_str) {
+sha1_hmac_get_digest_strA(const char *key, size_t key_size,
+    const char *data, size_t data_size, char *digest_str) {
 	uint8_t digest[SHA1_HASH_SIZE];
 
-	hmac_sha1((uint8_t*)key, key_size, (uint8_t*)data, data_size, digest);
+	hmac_sha1((const uint8_t*)key, key_size,
+	    (const uint8_t*)data, data_size, digest);
 	sha1_cvt_strA(digest, digest_str);
 }
 
 #ifdef _WINDOWS
 static inline void
-sha1_hmac_get_digest_strW(LPWSTR key, size_t key_size, LPWSTR data, size_t data_size,
-    LPWSTR digest_str) {
+sha1_hmac_get_digest_strW(const LPWSTR key, size_t key_size,
+    const LPWSTR data, size_t data_size, LPWSTR digest_str) {
 	uint8_t digest[SHA1_HASH_SIZE];
 
-	hmac_sha1((uint8_t*)key, key_size, (uint8_t*)data, data_size, digest);
+	hmac_sha1((const uint8_t*)key, key_size,
+	    (const uint8_t*)data, data_size, digest);
 	sha1_cvt_strW(digest, digest_str);
 }
 #endif
@@ -533,7 +536,7 @@ sha1_hmac_get_digest_strW(LPWSTR key, size_t key_size, LPWSTR data, size_t data_
 #ifdef SHA1_SELF_TEST
 /* 0 - OK, non zero - error */
 static inline int
-sha1_self_test() {
+sha1_self_test(void) {
 	size_t i, j;
 	sha1_ctx_t ctx;
 	uint8_t digest[SHA1_HASH_SIZE];
@@ -604,8 +607,9 @@ sha1_self_test() {
 
 	for (i = 0; NULL != data[i]; i ++) {
 		sha1_init(&ctx);
-		for (j = 0; j < repeat_count[i]; j ++)
+		for (j = 0; j < repeat_count[i]; j ++) {
 			sha1_update(&ctx, (uint8_t*)data[i], data_size[i]);
+		}
 		sha1_final(&ctx, digest);
 		sha1_cvt_hex(digest, (uint8_t*)digest_str);
 		if (0 != memcmp(digest_str, result_digest[i], SHA1_HASH_STR_SIZE))
@@ -623,4 +627,4 @@ sha1_self_test() {
 #endif
 
 
-#endif // AFX_SHA1__H__INCLUDED_
+#endif // __SHA1_H__INCLUDED__

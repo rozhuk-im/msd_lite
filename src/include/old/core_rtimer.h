@@ -52,13 +52,13 @@ typedef struct rtq_timer_s {
 	uintptr_t	interval;	/* timer interval, 0 - if one shot timer (no repeats) */
 	rtq_cb		cb_func;	/* function that called at time. */
 	void		*udata;		/* user defined data, per thread pool. */
-	uintptr_t	flags;		/* RT_TIMER_F_* */
+	uint32_t	flags;		/* RT_TIMER_F_* */
 } rtq_timer_t;
 
 TAILQ_HEAD(rtq_timer_head, rtq_timer_s);
 
-#define RT_TIMER_F_ALLOCATED	(1 << 0) /* Internal use. */
-#define RT_TIMER_F_PERIODIC	(1 << 1)
+#define RT_TIMER_F_ALLOCATED	(((uint32_t)1) << 0) /* Internal use. */
+#define RT_TIMER_F_PERIODIC	(((uint32_t)1) << 1)
 
 
 

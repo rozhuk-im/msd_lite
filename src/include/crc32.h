@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005 - 2013 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2005 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,16 +41,11 @@
  */
 
 
-#if !defined(AFX_CRC32__H__INCLUDED_)
-#define AFX_CRC32__H__INCLUDED_
+#ifndef __CRC32_H__
+#define __CRC32_H__
 
-#if _MSC_VER > 1000
-#pragma once
-#endif // _MSC_VER > 1000
-
-
-#include <sys/types.h>
 #include <inttypes.h>
+
 
 #define CRC32_INIT (0xffffffff)
 
@@ -129,7 +124,7 @@ static const uint32_t crc32_be_table256[256] = { /* Same as crc32_be_table16 */
 
 
 /* Reversed - Little Endian: 0xedb88320 */
-static uint32_t crc32_le_table16[] = {
+static const uint32_t crc32_le_table16[16] = {
 	0x00000000, 0x1db71064, 0x3b6e20c8, 0x26d930ac,
 	0x76dc4190, 0x6b6b51f4, 0x4db26158, 0x5005713c,
 	0xedb88320, 0xf00f9344, 0xd6d6a3e8, 0xcb61b38c,
@@ -210,13 +205,13 @@ static const uint32_t crc32_le_table256[256] = {
 /* Normal - Big Endian: 0x04c11db7 */
 /* 4 bit = 16 items look-up-table */
 static inline uint32_t
-crc32_be_ex4(uint8_t *buf, size_t buf_size, uint32_t init_crc32) {
+crc32_be_ex4(const uint8_t *buf, size_t buf_size, const uint32_t init_crc32) {
 	register uint32_t crc = init_crc32;
 
 	if (NULL == buf || 0 == buf_size)
 		return (crc);
 	while (buf_size --) {
-		crc ^= ((*buf ++) << 24);
+		crc ^= (((uint32_t)(*(buf ++))) << 24);
 		crc = ((crc << 4) ^ crc32_be_table256[(crc >> 28)]);
 		crc = ((crc << 4) ^ crc32_be_table256[(crc >> 28)]);
 	}
@@ -225,26 +220,28 @@ crc32_be_ex4(uint8_t *buf, size_t buf_size, uint32_t init_crc32) {
 
 /* 8 bit = 256 items look-up-table */
 static inline uint32_t
-crc32_be_ex8(uint8_t *buf, size_t buf_size, uint32_t init_crc32) {
+crc32_be_ex8(const uint8_t *buf, size_t buf_size, const uint32_t init_crc32) {
 	register uint32_t crc = init_crc32;
 
 	if (NULL == buf || 0 == buf_size)
 		return (crc);
-	while (buf_size --)
-		crc = ((crc << 8) ^ crc32_be_table256[((crc >> 24) ^ (*buf ++))]);
+	while (buf_size --) {
+		crc = ((crc << 8) ^ crc32_be_table256[((crc >> 24) ^ ((uint32_t)(*(buf ++))))]);
+	}
 	return (crc);
 }
 
 static inline uint32_t
-crc32_be_ex(uint8_t *buf, size_t buf_size, uint32_t init_crc32) {
+crc32_be_ex(const uint8_t *buf, const size_t buf_size,
+    const uint32_t init_crc32) {
 
-	if (256 > buf_size)
+	if (sizeof(crc32_be_table256) > buf_size)
 		return (crc32_be_ex4(buf, buf_size, init_crc32));
 	return (crc32_be_ex8(buf, buf_size, init_crc32));
 }
 
 static inline uint32_t
-crc32_be(uint8_t *buf, size_t buf_size) {
+crc32_be(const uint8_t *buf, const size_t buf_size) {
 
 	return (crc32_be_ex(buf, buf_size, CRC32_INIT));
 }
@@ -253,13 +250,14 @@ crc32_be(uint8_t *buf, size_t buf_size) {
 /* Reversed - Little Endian: 0xedb88320 */
 /* 4 bit = 16 items look-up-table */
 static inline uint32_t
-crc32_le_ex4(uint8_t *buf, size_t buf_size, uint32_t init_crc32) {
+crc32_le_ex4(const uint8_t *buf, size_t buf_size,
+    const uint32_t init_crc32) {
 	register uint32_t crc = ~init_crc32;
 
 	if (NULL == buf || 0 == buf_size)
 		return (~crc);
 	while (buf_size --) {
-		crc ^= *buf ++;
+		crc ^= ((uint32_t)(*(buf ++)));
 		crc = ((crc >> 4) ^ crc32_le_table16[(crc & 0x0000000f)]);
 		crc = ((crc >> 4) ^ crc32_le_table16[(crc & 0x0000000f)]);
 	}
@@ -268,29 +266,32 @@ crc32_le_ex4(uint8_t *buf, size_t buf_size, uint32_t init_crc32) {
 
 /* 8 bit = 256 items look-up-table */
 static inline uint32_t
-crc32_le_ex8(uint8_t *buf, size_t buf_size, uint32_t init_crc32) {
+crc32_le_ex8(const uint8_t *buf, size_t buf_size,
+    const uint32_t init_crc32) {
 	register uint32_t crc = ~init_crc32;
 
 	if (NULL == buf || 0 == buf_size)
 		return (~crc);
-	while (buf_size --)
-		crc = ((crc >> 8) ^ crc32_le_table256[(((*buf ++) ^ crc) & 0x000000ff)]);
+	while (buf_size --) {
+		crc = ((crc >> 8) ^ crc32_le_table256[((((uint32_t)(*(buf ++))) ^ crc) & 0x000000ff)]);
+	}
 	return (~crc);
 }
 
 static inline uint32_t
-crc32_le_ex(uint8_t *buf, size_t buf_size, uint32_t init_crc32) {
+crc32_le_ex(const uint8_t *buf, const size_t buf_size,
+    const uint32_t init_crc32) {
 
-	if (256 > buf_size)
+	if (sizeof(crc32_le_table256) > buf_size)
 		return (crc32_le_ex4(buf, buf_size, init_crc32));
 	return (crc32_le_ex8(buf, buf_size, init_crc32));
 }
 
 static inline uint32_t
-crc32_le(uint8_t *buf, size_t buf_size) {
+crc32_le(const uint8_t *buf, const size_t buf_size) {
 
 	return (crc32_le_ex(buf, buf_size, ~CRC32_INIT));
 }
 
 
-#endif // AFX_CRC32__H__INCLUDED_
+#endif /* __CRC32_H__ */

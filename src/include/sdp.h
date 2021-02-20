@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2012 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,10 +40,10 @@
 
 #include <sys/types.h>
 #include <inttypes.h>
-#include "mem_find.h"
+#include "mem_helpers.h"
 
-#if !defined(CRLF)
-#define CRLF		"\r\n"
+#ifndef CRLF
+#define CRLF	"\r\n"
 #endif
 
 
@@ -61,8 +61,9 @@ sdp_msg_type_get(uint8_t *sdp_msg, size_t sdp_msg_size, const uint8_t type,
 	/* Skeep first lines. */
 	val = (sdp_msg - 2);
 	start_line = (NULL != line) ? (*line) : 0;
-	for (i = 0; i < start_line && NULL != val; i ++)
-		val = mem_find(((val + 2) - sdp_msg), sdp_msg, sdp_msg_size, CRLF, 2);
+	for (i = 0; i < start_line && NULL != val; i ++) {
+		val = mem_find_ptr_cstr((val + 2), sdp_msg, sdp_msg_size, CRLF);
+	}
 
 	for (; NULL != val; i ++) {
 		val += 2;
@@ -74,8 +75,8 @@ sdp_msg_type_get(uint8_t *sdp_msg, size_t sdp_msg_size, const uint8_t type,
 			if (NULL != val_ret)
 				(*val_ret) = val;
 			if (NULL != val_ret_size) {
-				val_end = mem_find((val - sdp_msg), sdp_msg,
-				    sdp_msg_size, CRLF, 2);
+				val_end = mem_find_ptr_cstr(val, sdp_msg,
+				    sdp_msg_size, CRLF);
 				if (NULL == val_end)
 					val_end = (sdp_msg + sdp_msg_size);
 				(*val_ret_size) = (val_end - val);
@@ -83,7 +84,7 @@ sdp_msg_type_get(uint8_t *sdp_msg, size_t sdp_msg_size, const uint8_t type,
 			return (0);
 		}
 		/* Move to next value name. */
-		val = mem_find((val - sdp_msg), sdp_msg, sdp_msg_size, CRLF, 2);
+		val = mem_find_ptr_cstr(val, sdp_msg, sdp_msg_size, CRLF);
 	}
 	return (EINVAL);
 }
@@ -115,7 +116,7 @@ sdp_msg_feilds_get(uint8_t *buf, size_t buf_size, size_t max_feilds,
 	max_pos = (buf + buf_size);
 	while (max_feilds > ret && max_pos > cur_pos) {
 		/* Calculate data size. */
-		ptm = mem_find_byte((cur_pos - buf), buf, buf_size, ' ');
+		ptm = mem_chr_ptr(cur_pos, buf, buf_size, ' ');
 		if (NULL != ptm)
 			data_size = (ptm - cur_pos);
 		else

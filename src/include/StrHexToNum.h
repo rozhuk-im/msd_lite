@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005 - 2013 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2005 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -27,14 +27,9 @@
 
 
 
-#if !defined(AFX_STRHEXTONUM__H__INCLUDED_)
-#define AFX_STRHEXTONUM__H__INCLUDED_
+#ifndef __STRHEXTONUM_H__
+#define __STRHEXTONUM_H__
 
-
-
-#if _MSC_VER > 1000
-#pragma once
-#endif // _MSC_VER > 1000
 
 #ifdef _WINDOWS
 	#define uint8_t		unsigned char
@@ -46,33 +41,35 @@
 	#define	size_t		SIZE_T
 	#define	ssize_t		SSIZE_T
 #else
-#include <inttypes.h>
+#	include <inttypes.h>
 #endif
 
 
-#define STRHEX2NUM_SINGN(str, str_len, cur_singn, cur_char)			\
-	for (; 0 != str_len; str_len --, str ++) {				\
-		cur_char = (*str);						\
-		if ('-' == cur_char)						\
-			cur_singn = -1;						\
-		else if ('+' == cur_char)					\
-			cur_singn = 1;						\
-		else								\
-			break;							\
+#define STRHEX2NUM_SINGN(str, str_len, cur_singn, cur_char)		\
+	for (; 0 != str_len; str_len --, str ++) {			\
+		cur_char = (uint8_t)(*str);				\
+		if ('-' == cur_char) {					\
+			cur_singn = -1;					\
+		} else if ('+' == cur_char) {				\
+			cur_singn = 1;					\
+		} else {						\
+			break;						\
+		}							\
 	}
 
-#define STRHEX2NUM(str, str_len, ret_num, cur_char)				\
-	for (; 0 != str_len; str_len --, str ++) {				\
-		cur_char = (*str);						\
-		if ('0' <= cur_char && '9' >= cur_char)				\
-			cur_char -= '0';					\
-		else if ('a' <= cur_char && 'f' >= cur_char)			\
-			cur_char -= ('a' - 10);					\
-		else if ('A' <= cur_char && 'F' >= cur_char)			\
-			cur_char -= ('A' - 10);					\
-		else								\
-			continue;						\
-		ret_num = ((ret_num << 4) | cur_char);				\
+#define STRHEX2NUM(str, str_len, ret_num, cur_char)			\
+	for (; 0 != str_len; str_len --, str ++) {			\
+		cur_char = (uint8_t)(*str);				\
+		if ('0' <= cur_char && '9' >= cur_char) {		\
+			cur_char -= '0';				\
+		} else if ('a' <= cur_char && 'f' >= cur_char) {	\
+			cur_char -= ('a' - 10);				\
+		} else if ('A' <= cur_char && 'F' >= cur_char) {	\
+			cur_char -= ('A' - 10);				\
+		} else {						\
+			continue;					\
+		}							\
+		ret_num = ((ret_num << 4) | cur_char);			\
 	}
 
 
@@ -226,4 +223,4 @@ UStr8HexToNum64(const uint8_t *str, size_t str_len) {
 
 
 
-#endif // !defined(AFX_STRHEXTONUM__H__INCLUDED_)
+#endif /* __STRHEXTONUM_H__ */

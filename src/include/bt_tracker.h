@@ -191,12 +191,12 @@ static const uint8_t bt_tr_req_param_optional[] = {
 #define BT_TR_REQ_EV_UNKNOWN	5
 
 static const uint8_t *bt_tr_req_event[] = {
-	(uint8_t *)"none",		/* For logs only. size=0 */
-	(uint8_t *)"started",
-	(uint8_t *)"stopped",
-	(uint8_t *)"completed",
-	(uint8_t *)"paused",	/* http://bittorrent.org/beps/bep_0021.html */
-	(uint8_t *)"unknown"	/* For logs only. size=0 */
+	(uint8_t*)"none",		/* For logs only. size=0 */
+	(uint8_t*)"started",
+	(uint8_t*)"stopped",
+	(uint8_t*)"completed",
+	(uint8_t*)"paused",	/* http://bittorrent.org/beps/bep_0021.html */
+	(uint8_t*)"unknown"	/* For logs only. size=0 */
 };
 static const size_t bt_tr_req_event_size[] = {
 	0,

@@ -57,14 +57,17 @@
 #include <mntent.h>
 #include <linux/hdreg.h>
 #endif /* Linux specific code. */
+
+
 #define DISK_IDENT_STR_SIZE 20
 #define CPU_BRAND_STR_SIZE 48
 
+#define CPUID_HYPERVISOR_INFO 	0x40000000 /* Get hypervisor information: EBX-ECX-EDX. */
 
 
 static inline void
-native_cpuid(uint32_t index, uint32_t *eax, uint32_t *ebx, uint32_t *ecx,
-    uint32_t *edx) {
+native_cpuid(const uint32_t index, uint32_t *eax, uint32_t *ebx,
+    uint32_t *ecx, uint32_t *edx) {
 
 #if 1
 	__asm__ __volatile__(
@@ -101,7 +104,7 @@ get_cpu_brand_str(char *buf) {
 /* Return device name mounted to / */
 static inline int
 get_root_drive_dev_str(char *buf) {
-	int error;
+	int error = 0;
 
 	if (NULL == buf)
 		return (EINVAL);
@@ -138,7 +141,7 @@ get_root_drive_dev_str(char *buf) {
 /* Device serial, buf must point to mem size 20 = DISK_IDENT_STR_SIZE or more. */
 static inline int
 get_drive_id(const char *dirve, char *buf) {
-	int fd, error;
+	int fd, error = 0;
 	
 	if (NULL == dirve || NULL == buf)
 		return (EINVAL);

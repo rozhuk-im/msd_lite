@@ -1,6 +1,18 @@
 
+1.09 (21.07.2015)
+ + add skt default settings for all http server bindings
+ + add new option: fKeepAlive
+ + add new option: keepAliveIDLEtime
+ + add new option: keepAliveProbesInterval
+ + add new option: keepAliveNumberOfProbes
+ * http server lib upgraded to 1.6
+ * fix: http server: 'Content-Size' -> 'Content-Length'
+ * fix: linux: apply system limits before create thread pool
+ * fix: FreeBSD: thread pool may lost messages
+ * fAcceptFilter http server param does not work
+ * mmalloc_fd cant allocate >50% mem on FreeBSD without increace vm.max_wired
+ - remove option: fAcceptFilter for http server - allways ON
 
 
-
-1.01 (25.06.2013)
-- First public release
+1.01 (06.11.2014)
+- First public release - based on msd
