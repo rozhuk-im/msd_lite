@@ -446,6 +446,8 @@ int
 fd_set_nonblocking(int fd, int nonblocked) {
 	int opts;
 
+	if (-1 == fd)
+		return (EINVAL);
 	opts = fcntl(fd, F_GETFL); /* Read current options. */
 	if (-1 == opts)
 		return (errno);

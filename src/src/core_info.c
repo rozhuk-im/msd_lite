@@ -108,15 +108,20 @@ sysctl_str_to_buf(int *mib, u_int mib_cnt, const char *descr, size_t descr_size,
 		error = read_file_buf(path, path_size, (buf + descr_size), tm, &tm);
 		if (0 != error)
 			return (error);
-		tm --;
 #endif /* Linux specific code. */
 	}
-#ifdef BSD /* BSD specific code. */
-	tm --;
-#endif /* BSD specific code. */
 	memcpy(buf, descr, descr_size);
+	/* Remove CR, LF, TAB, SP, NUL from end */
+	tm += descr_size;
+	while (descr_size < tm && (
+	    '\r' == buf[(tm - 1)] ||
+	    '\n' == buf[(tm - 1)] ||
+	    '\t' == buf[(tm - 1)] ||
+	    ' ' == buf[(tm - 1)] ||
+	    0 == buf[(tm - 1)]))
+		tm --;
 	if (NULL != buf_size_ret)
-		(*buf_size_ret) = (descr_size + tm);
+		(*buf_size_ret) = tm;
 	return (0);
 }
 
@@ -125,10 +130,9 @@ int
 core_info_get_os_ver(const char *separator, size_t separator_size,
     char *buf, size_t buf_size, size_t *buf_size_ret) {
 	int error, mib[4];
-	size_t buf_used, tm;
+	size_t buf_used = 0, tm;
 
 	/* 'OS[sp]version' */
-	buf_used = 0;
 	mib[0] = CTL_KERN;
 
 	mib[1] = KERN_OSTYPE;
@@ -144,6 +148,7 @@ core_info_get_os_ver(const char *separator, size_t separator_size,
 	if (0 != error)
 		return (error);
 	buf_used += tm;
+
 	if (NULL != buf_size_ret)
 		(*buf_size_ret) = buf_used;
 	return (0);
