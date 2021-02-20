@@ -346,7 +346,8 @@ http_srv_create(thrp_p thrp, http_srv_on_conn_cb on_conn,
 	srv->s.hdrs_reserve_size *= 1024;
 	srv->s.http_server[srv->s.http_server_size] = 0;
 
-	srv->stat.start_time = thrpt_gettime(NULL, 0);
+	srv->stat.start_time = thrpt_gettime(NULL, 1);
+	srv->stat.start_time_abs = thrpt_gettime(NULL, 0);
 
 	(*srv_ret) = srv;
 	return (0);
@@ -846,7 +847,7 @@ http_srv_new_conn_cb(io_task_p iotask __unused, int error, uintptr_t skt,
 	}
 	if (0 != LOG_IS_ENABLED()) {
 		ss_to_str_addr_port(addr, straddr, sizeof(straddr), NULL);
-		LOGD_INFO_FMT("New client: %s", straddr);
+		LOGD_INFO_FMT("New client: %s (fd: %zu)", straddr, skt);
 	}
 
 	cli = http_srv_cli_alloc(acc, thrpt, skt, udata);

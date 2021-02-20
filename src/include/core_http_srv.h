@@ -93,6 +93,7 @@ typedef struct http_srv_stat_s {
 	volatile uint64_t	requests[HTTP_REQ_METHOD_UNKNOWN];
 	volatile uint64_t	requests_total;
 	time_t			start_time;
+	time_t			start_time_abs;
 } http_srv_stat_t, *http_srv_stat_p;
 
 
