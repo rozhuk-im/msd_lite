@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2012 - 2021 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,11 +35,11 @@
 #include <sys/queue.h>
 #include <time.h>
 
-#include "macro_helpers.h"
-#include "core_thrp.h"
-#include "core_io_buf.h"
-#include "core_io_task.h"
-#include "core_r_buf.h"
+#include "utils/macro.h"
+#include "threadpool/threadpool.h"
+#include "utils/io_buf.h"
+#include "threadpool/threadpool_task.h"
+#include "utils/ring_buffer.h"
 
 
 typedef struct str_hub_s	*str_hub_p;
@@ -154,14 +154,14 @@ typedef struct str_hub_s {
 	uint64_t	baud_rate_out;	/* Total rate out (megabit per sec). */
 	uint64_t	dropped_count;	/* Dropped clients count. */
 	/* -- stat */
-	io_task_p	iotask;		/* Data/Packets receiver. */
+	tp_task_p	tptask;		/* Data/Packets receiver. */
 	uintptr_t	r_buf_fd;	/* r_buf shared memory file descriptor */
 	r_buf_p		r_buf;		/* Ring buf, write pos. */
 #ifdef __linux__ /* Linux specific code. */
 	size_t		r_buf_rcvd;	/* Ring buf LOWAT emulator. */
 #endif /* Linux specific code. */
 
-	thrpt_p		thrpt;		/* Thread data for all IO operations. */
+	tpt_p		tpt;		/* Thread data for all IO operations. */
 	str_src_conn_params_t src_conn_params;	/* Point to str_src_conn_XXX */
 } str_hub_t;
 TAILQ_HEAD(str_hub_head, str_hub_s);
@@ -183,10 +183,10 @@ typedef struct str_hub_thread_data_s {
 
 
 typedef struct str_hubs_bckt_s {
-	thrp_p		thrp;
+	tp_p		tp;
 	struct timespec	tp_last_tmr;	/* For baud rate calculation. */
 	struct timespec	tp_last_tmr_next; /* For baud rate calculation. */
-	thrp_udata_t	service_tmr;	/* Service timer. */
+	tp_udata_t	service_tmr;	/* Service timer. */
 	str_hub_thrd_p	thr_data;	/* Per thread hubs + stat. */
 	size_t		base_http_hdrs_size;
 	uint8_t		base_http_hdrs[512];
@@ -200,14 +200,14 @@ void	str_src_settings_def(str_src_settings_p p_ret);
 void	str_src_conn_def(str_src_conn_params_p src_conn_params);
 
 
-int	str_hubs_bckt_create(thrp_p thrp, const char *app_ver,
+int	str_hubs_bckt_create(tp_p tp, const char *app_ver,
 	    str_hub_settings_p hub_params, str_src_settings_p src_params,
 	    str_hubs_bckt_p *shbskt_ret);
 void	str_hubs_bckt_destroy(str_hubs_bckt_p shbskt);
 
-typedef void (*str_hubs_bckt_enum_cb)(thrpt_p thrpt, str_hub_p str_hub, void *udata);
+typedef void (*str_hubs_bckt_enum_cb)(tpt_p tpt, str_hub_p str_hub, void *udata);
 int	str_hubs_bckt_enum(str_hubs_bckt_p shbskt, str_hubs_bckt_enum_cb enum_cb,
-	    void *udata, thrpt_msg_done_cb done_cb);
+	    void *udata, tpt_msg_done_cb done_cb);
 int	str_hubs_bckt_stat_summary(str_hubs_bckt_p shbskt, str_hubs_stat_p stat);
 
 

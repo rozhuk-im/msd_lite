@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012 - 2014 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2012 - 2021 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,14 +30,14 @@
 #ifndef __MSD_STAT_TEXT_H__
 #define __MSD_STAT_TEXT_H__
 
-#include "core_http_srv.h"
+#include "proto/http_server.h"
 #include "stream_sys.h"
 
 
 int	gen_hub_stat_text_send_async(str_hubs_bckt_p shbskt, http_srv_cli_p cli);
 
 int	gen_stat_text(const char *package_name, const char *package_version,
-	    str_hubs_bckt_p shbskt, core_info_sysres_p sysres,
+	    str_hubs_bckt_p shbskt, info_sysres_p sysres,
 	    uint8_t *sysinfo, size_t sysinfo_size,
 	    uint8_t *syslimits, size_t syslimits_size,
 	    http_srv_cli_p cli);

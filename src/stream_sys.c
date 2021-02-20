@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012 - 2016 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2012 - 2021 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,12 +29,6 @@
 
 
 #include <sys/param.h>
-
-#ifdef __linux__ /* Linux specific code. */
-#	define _GNU_SOURCE /* See feature_test_macros(7) */
-#	define __USE_GNU 1
-#endif /* Linux specific code. */
-
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/mman.h>
@@ -50,20 +44,22 @@
 #include <time.h>
 #include <errno.h>
 
-#include "macro_helpers.h"
-#include "core_thrp.h"
-#include "core_thrp_msg.h"
-#include "core_io_task.h"
-#include "core_io_net.h"
-#include "core_net_helpers.h"
-#include "core_info.h"
-#include "core_helpers.h"
-#include "core_log.h"
-#include "rtp.h"
-#include "mpeg2ts.h"
-#include "md5.h"
-#include "mem_helpers.h"
-#include "HTTP.h"
+#include "utils/macro.h"
+#include "utils/sys.h"
+#include "threadpool/threadpool.h"
+#include "threadpool/threadpool_msg_sys.h"
+#include "threadpool/threadpool_task.h"
+#include "net/socket.h"
+#include "net/socket_address.h"
+#include "net/utils.h"
+#include "utils/info.h"
+#include "utils/buf_str.h"
+#include "utils/log.h"
+#include "proto/rtp.h"
+#include "proto/mpeg2ts.h"
+#include "crypto/hash/md5.h"
+#include "utils/mem_utils.h"
+#include "proto/http.h"
 #include "stream_sys.h"
 
 /* Internal constants. */
@@ -87,35 +83,35 @@ typedef struct str_hubs_bckt_enum_data_s { /* thread message sync data. */
 	str_hubs_bckt_p		shbskt;
 	str_hubs_bckt_enum_cb	enum_cb;
 	void			*udata;
-	thrpt_msg_done_cb	done_cb;
+	tpt_msg_done_cb	done_cb;
 } str_hubs_bckt_enum_data_t, *str_hubs_bckt_enum_data_p;
 
 
 
-thrpt_p	str_hub_thrpt_get_by_name(thrp_p thrp, const uint8_t *name, size_t name_size);
+tpt_p	str_hub_tpt_get_by_name(tp_p tp, const uint8_t *name, size_t name_size);
 
-static void	str_hubs_bckt_destroy_msg_cb(thrpt_p thrpt, void *udata);
+static void	str_hubs_bckt_destroy_msg_cb(tpt_p tpt, void *udata);
 
-static void	str_hubs_bckt_enum_msg_cb(thrpt_p thrpt, void *udata);
-static void	str_hubs_bckt_enum_done_cb(thrpt_p thrpt, size_t send_msg_cnt,
+static void	str_hubs_bckt_enum_msg_cb(tpt_p tpt, void *udata);
+static void	str_hubs_bckt_enum_done_cb(tpt_p tpt, size_t send_msg_cnt,
 		    size_t error_cnt, void *udata);
 
 void		str_hubs_bckt_timer_service(str_hubs_bckt_p shbskt,
 		    str_hub_p str_hub, str_hubs_stat_p stat);
-static void	str_hubs_bckt_timer_msg_cb(thrpt_p thrpt, void *udata);
-static void	str_hubs_bckt_timer_cb(thrp_event_p ev, thrp_udata_p thrp_udata);
+static void	str_hubs_bckt_timer_msg_cb(tpt_p tpt, void *udata);
+static void	str_hubs_bckt_timer_cb(tp_event_p ev, tp_udata_p tp_udata);
 
-int	str_hub_create_int(str_hubs_bckt_p shbskt, thrpt_p thrpt,
+int	str_hub_create_int(str_hubs_bckt_p shbskt, tpt_p tpt,
 	    uint8_t *name, size_t name_size,
 	    str_src_conn_params_p src_conn_params, str_hub_p *str_hub_ret);
 void	str_hub_destroy_int(str_hub_p str_hub);
 
-void	str_hub_cli_attach_msg_cb(thrpt_p thrpt, void *udata);
+void	str_hub_cli_attach_msg_cb(tpt_p tpt, void *udata);
 
 int	str_hub_send_to_client(str_hub_p str_hub, str_hub_cli_p strh_cli,
 	    size_t *transfered_size);
 int	str_hub_send_to_clients(str_hub_p str_hub);
-static int str_src_recv_mc_cb(io_task_p iotask, int error, uint32_t eof,
+static int str_src_recv_mc_cb(tp_task_p tptask, int error, uint32_t eof,
 	    size_t data2transfer_size, void *arg);
 int	str_src_r_buf_alloc(str_hub_p str_hub);
 void	str_src_r_buf_free(str_hub_p str_hub);
@@ -123,21 +119,21 @@ void	str_src_r_buf_free(str_hub_p str_hub);
 
 
 /* XXX Thread pool balancer */
-thrpt_p
-str_hub_thrpt_get_by_name(thrp_p thrp, const uint8_t *name, size_t name_size) {
+tpt_p
+str_hub_tpt_get_by_name(tp_p tp, const uint8_t *name, size_t name_size) {
 	size_t thread_num, thread_cnt;
 	uint8_t hash[MD5_HASH_SIZE];
 
 	md5_get_digest(name, name_size, hash);
 
-	thread_cnt = thrp_thread_count_max_get(thrp);
+	thread_cnt = tp_thread_count_max_get(tp);
 	//thread_num = (/*(hash / thread_cnt) ^*/ (hash % thread_cnt));
 	thread_num = ((thread_cnt * data_xor8(hash, sizeof(hash))) / 256);
 	if (thread_cnt < thread_num) {
 		thread_num = (thread_cnt - 1);
 	}
 
-	return (thrp_thread_get(thrp, thread_num));
+	return (tp_thread_get(tp, thread_num));
 }
 
 
@@ -176,7 +172,7 @@ str_src_conn_def(str_src_conn_params_p src_conn_params) {
 
 
 int
-str_hubs_bckt_create(thrp_p thrp, const char *app_ver, str_hub_settings_p hub_params,
+str_hubs_bckt_create(tp_p tp, const char *app_ver, str_hub_settings_p hub_params,
     str_src_settings_p src_params, str_hubs_bckt_p *shbskt_ret) {
 	int error;
 	str_hubs_bckt_p shbskt;
@@ -188,7 +184,7 @@ str_hubs_bckt_create(thrp_p thrp, const char *app_ver, str_hub_settings_p hub_pa
 	shbskt = zalloc(sizeof(str_hubs_bckt_t) + hub_params->cust_http_hdrs_size + sizeof(void*));
 	if (NULL == shbskt)
 		return (ENOMEM);
-	thread_count_max = thrp_thread_count_max_get(thrp);
+	thread_count_max = tp_thread_count_max_get(tp);
 	shbskt->thr_data = zalloc((sizeof(str_hub_thrd_t) * thread_count_max));
 	if (NULL == shbskt->thr_data) {
 		error = ENOMEM;
@@ -238,14 +234,14 @@ str_hubs_bckt_create(thrp_p thrp, const char *app_ver, str_hub_settings_p hub_pa
 	/* Use short name. */
 	src_params = &shbskt->src_params;
 	/* Correct values. */
-	src_params->skt_rcv_lowat = min(src_params->skt_rcv_lowat, src_params->skt_rcv_buf);
+	src_params->skt_rcv_lowat = MIN(src_params->skt_rcv_lowat, src_params->skt_rcv_buf);
 	/* sec->ms, kb -> bytes */
 	src_params->skt_rcv_buf *= 1024;
 	src_params->skt_rcv_lowat *= 1024;
 	//src_params->rcv_timeout =; // In seconds!
 	
 	/* Base HTTP headers. */
-	if (0 != core_info_get_os_ver("/", 1, osver,
+	if (0 != info_get_os_ver("/", 1, osver,
 	    (sizeof(osver) - 1), NULL))
 		memcpy(osver, "Generic OS/1.0", 15);
 	shbskt->base_http_hdrs_size = (size_t)snprintf((char*)shbskt->base_http_hdrs,
@@ -254,13 +250,13 @@ str_hubs_bckt_create(thrp_p thrp, const char *app_ver, str_hub_settings_p hub_pa
 	    "Connection: close\r\n",
 	    osver, app_ver);
 	/* Timer */
-	shbskt->thrp = thrp;
+	shbskt->tp = tp;
 	shbskt->service_tmr.cb_func = str_hubs_bckt_timer_cb;
 	shbskt->service_tmr.ident = (uintptr_t)shbskt;
-	error = thrpt_ev_add_ex(thrp_thread_get_rr(shbskt->thrp), THRP_EV_TIMER,
+	error = tpt_ev_add_args(tp_thread_get_rr(shbskt->tp), TP_EV_TIMER,
 	    0, 0, 1000 /* 1 sec. */, &shbskt->service_tmr);
 	if (0 != error) {
-		LOGD_ERR(error, "thrpt_ev_add_ex()");
+		LOGD_ERR(error, "tpt_ev_add_args()");
 		goto err_out;
 	}
 
@@ -276,13 +272,16 @@ err_out:
 
 void
 str_hubs_bckt_destroy(str_hubs_bckt_p shbskt) {
+	tp_event_t ev;
 
 	if (NULL == shbskt)
 		return;
-	thrpt_ev_del(THRP_EV_TIMER, &shbskt->service_tmr);
+	memset(&ev, 0x00, sizeof(ev));
+	ev.event = TP_EV_TIMER;
+	tpt_ev_del(&ev, &shbskt->service_tmr);
 	/* Broadcast to all threads. */
-	thrpt_msg_bsend(shbskt->thrp, NULL,
-	    (THRP_MSG_F_SELF_DIRECT | THRP_MSG_F_FORCE | THRP_MSG_F_FAIL_DIRECT | THRP_BMSG_F_SYNC),
+	tpt_msg_bsend(shbskt->tp, NULL,
+	    (TP_MSG_F_SELF_DIRECT | TP_MSG_F_FORCE | TP_MSG_F_FAIL_DIRECT | TP_BMSG_F_SYNC),
 	    str_hubs_bckt_destroy_msg_cb, shbskt);
 
 	free(shbskt->thr_data);
@@ -290,13 +289,13 @@ str_hubs_bckt_destroy(str_hubs_bckt_p shbskt) {
 	free(shbskt);
 }
 static void
-str_hubs_bckt_destroy_msg_cb(thrpt_p thrpt, void *udata) {
+str_hubs_bckt_destroy_msg_cb(tpt_p tpt, void *udata) {
 	str_hubs_bckt_p shbskt = (str_hubs_bckt_p)udata;
 	str_hub_p str_hub, str_hub_temp;
 	size_t thread_num;
 
 	//LOGD_EV("...");
-	thread_num = thrp_thread_get_num(thrpt);
+	thread_num = tp_thread_get_num(tpt);
 
 	TAILQ_FOREACH_SAFE(str_hub, &shbskt->thr_data[thread_num].hub_head, next,
 	    str_hub_temp) {
@@ -307,7 +306,7 @@ str_hubs_bckt_destroy_msg_cb(thrpt_p thrpt, void *udata) {
 
 int
 str_hubs_bckt_enum(str_hubs_bckt_p shbskt, str_hubs_bckt_enum_cb enum_cb,
-    void *udata, thrpt_msg_done_cb done_cb) {
+    void *udata, tpt_msg_done_cb done_cb) {
 	int error;
 	str_hubs_bckt_enum_data_p enum_data;
 
@@ -321,8 +320,8 @@ str_hubs_bckt_enum(str_hubs_bckt_p shbskt, str_hubs_bckt_enum_cb enum_cb,
 	enum_data->udata = udata;
 	enum_data->done_cb = done_cb;
 
-	error = thrpt_msg_cbsend(shbskt->thrp, NULL,
-	    (THRP_CBMSG_F_ONE_BY_ONE), str_hubs_bckt_enum_msg_cb,
+	error = tpt_msg_cbsend(shbskt->tp, NULL,
+	    (TP_CBMSG_F_ONE_BY_ONE), str_hubs_bckt_enum_msg_cb,
 	    enum_data, str_hubs_bckt_enum_done_cb);
 	if (0 != error) {
 		free(enum_data);
@@ -331,27 +330,27 @@ str_hubs_bckt_enum(str_hubs_bckt_p shbskt, str_hubs_bckt_enum_cb enum_cb,
 	return (error);
 }
 static void
-str_hubs_bckt_enum_msg_cb(thrpt_p thrpt, void *udata) {
+str_hubs_bckt_enum_msg_cb(tpt_p tpt, void *udata) {
 	str_hubs_bckt_enum_data_p enum_data = udata;
 	str_hubs_bckt_p shbskt = enum_data->shbskt;
 	str_hub_p str_hub, str_hub_temp;
 	size_t thread_num;
 
 	//LOGD_EV("...");
-	thread_num = thrp_thread_get_num(thrpt);
+	thread_num = tp_thread_get_num(tpt);
 
 	TAILQ_FOREACH_SAFE(str_hub, &shbskt->thr_data[thread_num].hub_head, next,
 	    str_hub_temp) {
-		enum_data->enum_cb(thrpt, str_hub, enum_data->udata);
+		enum_data->enum_cb(tpt, str_hub, enum_data->udata);
 	}
 }
 static void
-str_hubs_bckt_enum_done_cb(thrpt_p thrpt, size_t send_msg_cnt, size_t error_cnt,
+str_hubs_bckt_enum_done_cb(tpt_p tpt, size_t send_msg_cnt, size_t error_cnt,
     void *udata) {
 	str_hubs_bckt_enum_data_p enum_data = udata;
 
 	if (NULL != enum_data->done_cb)
-		enum_data->done_cb(thrpt, send_msg_cnt, error_cnt, enum_data->udata);
+		enum_data->done_cb(tpt, send_msg_cnt, error_cnt, enum_data->udata);
 	free(enum_data);
 }
 
@@ -362,7 +361,7 @@ str_hubs_bckt_stat_summary(str_hubs_bckt_p shbskt, str_hubs_stat_p stat) {
 
 	if (NULL == shbskt || NULL == stat)
 		return (EINVAL);
-	thread_cnt = thrp_thread_count_max_get(shbskt->thrp);
+	thread_cnt = tp_thread_count_max_get(shbskt->tp);
 	mem_bzero(stat, sizeof(str_hubs_stat_t));
 	for (i = 0; i < thread_cnt; i ++) {
 		stat->str_hub_count += shbskt->thr_data[i].stat.str_hub_count;
@@ -418,14 +417,14 @@ str_hubs_bckt_timer_service(str_hubs_bckt_p shbskt, str_hub_p str_hub,
 	}
 }
 static void
-str_hubs_bckt_timer_msg_cb(thrpt_p thrpt, void *udata) {
+str_hubs_bckt_timer_msg_cb(tpt_p tpt, void *udata) {
 	str_hubs_bckt_p shbskt = (str_hubs_bckt_p)udata;
 	str_hub_p str_hub, str_hub_temp;
 	str_hubs_stat_t stat;
 	size_t thread_num;
 
 	//LOGD_EV("...");
-	thread_num = thrp_thread_get_num(thrpt);
+	thread_num = tp_thread_get_num(tpt);
 	mem_bzero(&stat, sizeof(str_hubs_stat_t));
 
 	/* Enum all Stream Hubs associated with this thread. */
@@ -437,22 +436,22 @@ str_hubs_bckt_timer_msg_cb(thrpt_p thrpt, void *udata) {
 	memcpy(&shbskt->thr_data[thread_num].stat, &stat, sizeof(str_hubs_stat_t));
 }
 static void
-str_hubs_bckt_timer_cb(thrp_event_p ev __unused, thrp_udata_p thrp_udata) {
-	str_hubs_bckt_p shbskt = (str_hubs_bckt_p)thrp_udata->ident;
+str_hubs_bckt_timer_cb(tp_event_p ev __unused, tp_udata_p tp_udata) {
+	str_hubs_bckt_p shbskt = (str_hubs_bckt_p)tp_udata->ident;
 
 	//LOGD_EV("...");
 	if (NULL == shbskt)
 		return;
 	memcpy(&shbskt->tp_last_tmr, &shbskt->tp_last_tmr_next, sizeof(struct timespec));
-	thrpt_gettimev(thrp_udata->thrpt, 0, &shbskt->tp_last_tmr_next);
+	clock_gettime(CLOCK_MONOTONIC_FAST, &shbskt->tp_last_tmr_next);
 	/* Broadcast to all threads. */
-	thrpt_msg_bsend(shbskt->thrp, thrp_udata->thrpt,
-	    THRP_MSG_F_SELF_DIRECT, str_hubs_bckt_timer_msg_cb, shbskt);
+	tpt_msg_bsend(shbskt->tp, tp_udata->tpt,
+	    TP_MSG_F_SELF_DIRECT, str_hubs_bckt_timer_msg_cb, shbskt);
 }
 
 
 int
-str_hub_create_int(str_hubs_bckt_p shbskt, thrpt_p thrpt, uint8_t *name, size_t name_size,
+str_hub_create_int(str_hubs_bckt_p shbskt, tpt_p tpt, uint8_t *name, size_t name_size,
     str_src_conn_params_p src_conn_params, str_hub_p *str_hub_ret) {
 	int error;
 	str_hub_p str_hub;
@@ -473,50 +472,50 @@ str_hub_create_int(str_hubs_bckt_p shbskt, thrpt_p thrpt, uint8_t *name, size_t 
 	str_hub->name_size = name_size;
 	memcpy(str_hub->name, name, name_size);
 	TAILQ_INIT(&str_hub->cli_head);
-	str_hub->thrpt = thrpt;
-	thrpt_gettimev(str_hub->thrpt, 0, &str_hub->tp_last_recv);
+	str_hub->tpt = tpt;
+	clock_gettime(CLOCK_MONOTONIC_FAST, &str_hub->tp_last_recv);
 	str_hub->r_buf_fd = (uintptr_t)-1;
 
 	src_params = &shbskt->src_params;
 	memcpy(&str_hub->src_conn_params, src_conn_params, sizeof(str_src_conn_params_t));
 	conn_udp = &src_conn_params->udp;
-	error = io_net_bind(&conn_udp->addr, SOCK_DGRAM, IPPROTO_UDP,
+	error = skt_bind(&conn_udp->addr, SOCK_DGRAM, IPPROTO_UDP,
 	    (SO_F_NONBLOCK | SO_F_REUSEADDR | SO_F_REUSEPORT),
 	    &skt);
 	if (0 != error) /* Bind to mc addr fail, try bind inaddr_any. */
-		error = io_net_bind_ap(conn_udp->addr.ss_family,
+		error = skt_bind_ap(conn_udp->addr.ss_family,
 		    NULL, sa_port_get(&conn_udp->addr),
 		    SOCK_DGRAM, IPPROTO_UDP,
 		    (SO_F_NONBLOCK | SO_F_REUSEADDR | SO_F_REUSEPORT),
 		    &skt);
 	if (0 != error) {
 		skt = (uintptr_t)-1;
-		LOG_ERR(error, "io_net_mc_bind()");
+		LOG_ERR(error, "skt_mc_bind()");
 		goto err_out;
 	}
 	/* Join to multicast group. */
-	error = io_net_mc_join(skt, 1, src_conn_params->mc.if_index,
+	error = skt_mc_join(skt, 1, src_conn_params->mc.if_index,
 	    &conn_udp->addr);
 	if (0 != error) {
-		LOG_ERR(error, "io_net_mc_join()");
+		LOG_ERR(error, "skt_mc_join()");
 		goto err_out;
 	}
 	/* Tune socket. */
-	error = io_net_rcv_tune(skt, src_params->skt_rcv_buf, src_params->skt_rcv_lowat);
+	error = skt_rcv_tune(skt, src_params->skt_rcv_buf, src_params->skt_rcv_lowat);
 	if (0 != error) {
-		LOG_ERR(error, "io_net_rcv_tune()");
+		LOG_ERR(error, "skt_rcv_tune()");
 		goto err_out;
 	}
 	/* Create IO task for socket. */
-	error = io_task_notify_create(str_hub->thrpt, skt,
-	    IO_TASK_F_CLOSE_ON_DESTROY, THRP_EV_READ, 0, str_src_recv_mc_cb,
-	    str_hub, &str_hub->iotask);
+	error = tp_task_notify_create(str_hub->tpt, skt,
+	    TP_TASK_F_CLOSE_ON_DESTROY, TP_EV_READ, 0, str_src_recv_mc_cb,
+	    str_hub, &str_hub->tptask);
 	if (0 != error) {
-		LOG_ERR(error, "io_task_notify_create()");
+		LOG_ERR(error, "tp_task_notify_create()");
 		goto err_out;
 	}
 
-	TAILQ_INSERT_HEAD(&shbskt->thr_data[thrp_thread_get_num(thrpt)].hub_head,
+	TAILQ_INSERT_HEAD(&shbskt->thr_data[tp_thread_get_num(tpt)].hub_head,
 	    str_hub, next);
 
 	LOG_INFO_FMT("%s: Created. (fd: %zu)", str_hub->name, skt);
@@ -527,7 +526,7 @@ str_hub_create_int(str_hubs_bckt_p shbskt, thrpt_p thrpt, uint8_t *name, size_t 
 err_out:
 	/* Error. */
 	close((int)skt);
-	str_hub_destroy_int(str_hub);
+	free(str_hub);
 	(*str_hub_ret) = NULL;
 	LOG_ERR(error, "...");
 	return (error);
@@ -542,11 +541,12 @@ str_hub_destroy_int(str_hub_p str_hub) {
 	if (NULL == str_hub)
 		return;
 	/* Leave multicast group. */
-	io_task_destroy(str_hub->iotask);
+	tp_task_destroy(str_hub->tptask);
 
-	TAILQ_REMOVE(&str_hub->shbskt->thr_data[thrp_thread_get_num(str_hub->thrpt)].hub_head,
-	    str_hub, next);
-
+	if (TAILQ_PREV_PTR(str_hub, next)) {
+		TAILQ_REMOVE(&str_hub->shbskt->thr_data[tp_thread_get_num(str_hub->tpt)].hub_head,
+		    str_hub, next);
+	}
 	/* Destroy all connected clients. */
 	TAILQ_FOREACH_SAFE(strh_cli, &str_hub->cli_head, next, strh_cli_temp) {
 		str_hub_cli_destroy(str_hub, strh_cli);
@@ -609,15 +609,20 @@ str_hub_cli_destroy(str_hub_p str_hub, str_hub_cli_p strh_cli) {
 	/* Send HTTP headers if needed. */
 	if (0 == (STR_HUB_CLI_STATE_F_HTTP_HDRS_SENDED & strh_cli->flags) &&
 	    0 == strh_cli->offset) {
-		iov[0].iov_base = MK_RW_PTR("HTTP/1.1 503 Service Unavailable\r\n");
-		iov[0].iov_len = 34;
-		iov[1].iov_base = str_hub->shbskt->base_http_hdrs;
-		iov[1].iov_len = str_hub->shbskt->base_http_hdrs_size;
-		iov[2].iov_base = MK_RW_PTR("\r\n");
-		iov[2].iov_len = 2;
 		mem_bzero(&mhdr, sizeof(mhdr));
 		mhdr.msg_iov = (struct iovec*)iov;
-		mhdr.msg_iovlen = 3;
+
+		iov[mhdr.msg_iovlen].iov_base = MK_RW_PTR("HTTP/1.1 503 Service Unavailable\r\n");
+		iov[mhdr.msg_iovlen].iov_len = 34;
+		mhdr.msg_iovlen ++;
+		if (NULL != str_hub) {
+			iov[mhdr.msg_iovlen].iov_base = str_hub->shbskt->base_http_hdrs;
+			iov[mhdr.msg_iovlen].iov_len = str_hub->shbskt->base_http_hdrs_size;
+			mhdr.msg_iovlen ++;
+		}
+		iov[mhdr.msg_iovlen].iov_base = MK_RW_PTR("\r\n");
+		iov[mhdr.msg_iovlen].iov_len = 2;
+		mhdr.msg_iovlen ++;
 		sendmsg((int)strh_cli->skt, &mhdr, (MSG_DONTWAIT | MSG_NOSIGNAL));
 	}
 
@@ -631,7 +636,7 @@ int
 str_hub_cli_attach(str_hubs_bckt_p shbskt, str_hub_cli_p strh_cli,
     uint8_t *hub_name, size_t hub_name_size, str_src_conn_params_p src_conn_params) {
 	int error;
-	thrpt_p thrpt;
+	tpt_p tpt;
 	str_hub_cli_attach_cb_data_p cli_data;
 
 	if (NULL == shbskt || NULL == strh_cli || NULL == hub_name ||
@@ -648,8 +653,8 @@ str_hub_cli_attach(str_hubs_bckt_p shbskt, str_hub_cli_p strh_cli,
 	cli_data->hub_name_size = hub_name_size;
 	memcpy(&cli_data->src_conn_params, src_conn_params, sizeof(str_src_conn_params_t));
 	
-	thrpt = str_hub_thrpt_get_by_name(shbskt->thrp, hub_name, hub_name_size);
-	error = thrpt_msg_send(thrpt, NULL, THRP_MSG_F_SELF_DIRECT,
+	tpt = str_hub_tpt_get_by_name(shbskt->tp, hub_name, hub_name_size);
+	error = tpt_msg_send(tpt, NULL, TP_MSG_F_SELF_DIRECT,
 	    str_hub_cli_attach_msg_cb, cli_data);
 	if (0 != error) {
 		free(cli_data);
@@ -658,7 +663,7 @@ str_hub_cli_attach(str_hubs_bckt_p shbskt, str_hub_cli_p strh_cli,
 	return (error);
 }
 void
-str_hub_cli_attach_msg_cb(thrpt_p thrpt, void *udata) {
+str_hub_cli_attach_msg_cb(tpt_p tpt, void *udata) {
 	str_hub_cli_attach_cb_data_p cli_data = udata;
 	str_hub_p str_hub, str_hub_temp;
 	str_hub_cli_p strh_cli;
@@ -669,7 +674,7 @@ str_hub_cli_attach_msg_cb(thrpt_p thrpt, void *udata) {
 
 	LOGD_EV("...");
 
-	thread_num = thrp_thread_get_num(thrpt);
+	thread_num = tp_thread_get_num(tpt);
 	TAILQ_FOREACH_SAFE(str_hub, &cli_data->shbskt->thr_data[thread_num].hub_head,
 	    next, str_hub_temp) {
 		if (str_hub->name_size != cli_data->hub_name_size)
@@ -680,7 +685,7 @@ str_hub_cli_attach_msg_cb(thrpt_p thrpt, void *udata) {
 		}
 	}
 	if (0 != error) { /* Create new... */
-		error = str_hub_create_int(cli_data->shbskt, thrpt,
+		error = str_hub_create_int(cli_data->shbskt, tpt,
 		    cli_data->hub_name, cli_data->hub_name_size,
 		    &cli_data->src_conn_params, &str_hub);
 		if (0 != error) {
@@ -695,22 +700,22 @@ str_hub_cli_attach_msg_cb(thrpt_p thrpt, void *udata) {
 	strh_cli = cli_data->strh_cli;
 	hub_params = &cli_data->shbskt->hub_params;
 	/* Set. */
-	strh_cli->conn_time = thrpt_gettime(str_hub->thrpt, 0);
+	strh_cli->conn_time = gettime_monotonic();
 	/* Tune socket. */
 	/* Reduce kernel memory usage. */
-	error = io_net_rcv_tune(strh_cli->skt, STR_HUB_CLI_RECV_BUF, STR_HUB_CLI_RECV_LOWAT);
+	error = skt_rcv_tune(strh_cli->skt, STR_HUB_CLI_RECV_BUF, STR_HUB_CLI_RECV_LOWAT);
 	if (0 != error) {
 		if (0 != LOG_IS_ENABLED()) {
 			sa_addr_port_to_str(&strh_cli->remonte_addr, straddr, sizeof(straddr), NULL);
-			LOG_ERR_FMT(error, "%s - %s: io_net_rcv_tune()",
+			LOG_ERR_FMT(error, "%s - %s: skt_rcv_tune()",
 			    str_hub->name, straddr);
 		}
 	}
-	error = io_net_snd_tune(strh_cli->skt, hub_params->skt_snd_buf, 1);
+	error = skt_snd_tune(strh_cli->skt, hub_params->skt_snd_buf, 1);
 	if (0 != error) {
 		if (0 != LOG_IS_ENABLED()) {
 			sa_addr_port_to_str(&strh_cli->remonte_addr, straddr, sizeof(straddr), NULL);
-			LOG_ERR_FMT(error, "%s - %s: io_net_snd_tune()",
+			LOG_ERR_FMT(error, "%s - %s: skt_snd_tune()",
 			    str_hub->name, straddr);
 		}
 	}
@@ -723,24 +728,24 @@ str_hub_cli_attach_msg_cb(thrpt_p thrpt, void *udata) {
 			    str_hub->name, straddr);
 		}
 	}
-	error = io_net_set_tcp_nodelay(strh_cli->skt, (STR_HUB_S_F_SKT_TCP_NODELAY & hub_params->flags));
+	error = skt_set_tcp_nodelay(strh_cli->skt, (STR_HUB_S_F_SKT_TCP_NODELAY & hub_params->flags));
 	if (0 != error && 0 != LOG_IS_ENABLED()) {
 		sa_addr_port_to_str(&strh_cli->remonte_addr, straddr, sizeof(straddr), NULL);
-		LOG_ERR_FMT(error, "%s - %s: io_net_set_tcp_nodelay()",
+		LOG_ERR_FMT(error, "%s - %s: skt_set_tcp_nodelay()",
 		    str_hub->name, straddr);
 	}
-	error = io_net_set_tcp_nopush(strh_cli->skt, (STR_HUB_S_F_SKT_TCP_NOPUSH & hub_params->flags));
+	error = skt_set_tcp_nopush(strh_cli->skt, (STR_HUB_S_F_SKT_TCP_NOPUSH & hub_params->flags));
 	if (0 != error && 0 != LOG_IS_ENABLED()) {
 		sa_addr_port_to_str(&strh_cli->remonte_addr, straddr, sizeof(straddr), NULL);
-		LOG_ERR_FMT(error, "%s - %s: io_net_set_tcp_nopush()",
+		LOG_ERR_FMT(error, "%s - %s: skt_set_tcp_nopush()",
 		    str_hub->name, straddr);
 	}
 	if (0 != hub_params->cc_name_size) {
-		error = io_net_set_tcp_cc(strh_cli->skt, hub_params->cc_name,
+		error = skt_set_tcp_cc(strh_cli->skt, hub_params->cc_name,
 	            hub_params->cc_name_size);
 		if (0 != error && 0 != LOG_IS_ENABLED()) {
 			sa_addr_port_to_str(&strh_cli->remonte_addr, straddr, sizeof(straddr), NULL);
-			LOG_ERR_FMT(error, "%s - %s: io_net_set_tcp_cc()",
+			LOG_ERR_FMT(error, "%s - %s: skt_set_tcp_cc()",
 			    str_hub->name, straddr);
 		}
 	}
@@ -783,15 +788,15 @@ str_hub_send_to_client(str_hub_p str_hub, str_hub_cli_p strh_cli,
 	/* Send. */
 	r_buf_data_get_conv2off(str_hub->r_buf, (iovec_p)iov, iov_cnt);
 	for (i = 0; i < iov_cnt; i ++) {
-		error = io_net_sendfile(str_hub->r_buf_fd, strh_cli->skt,
+		error = skt_sendfile(str_hub->r_buf_fd, strh_cli->skt,
 		    (off_t)iov[i].iov_base, iov[i].iov_len,
-		    (IO_NET_SF_F_NODISKIO), &sbytes);
+		    (SKT_SF_F_NODISKIO), &sbytes);
 		tr_size += (size_t)sbytes;
 		if (0 != error)
 			break;
 	}
 	/* Supress some errors. */
-	error = IO_NET_ERR_FILTER(error);
+	error = SKT_ERR_FILTER(error);
 	/* Update client read pos. */
 	r_buf_rpos_inc(str_hub->r_buf, &strh_cli->rpos, tr_size);
 
@@ -831,7 +836,7 @@ str_hub_send_to_clients(str_hub_p str_hub) {
 			ios = sendmsg((int)strh_cli->skt, &mhdr, (MSG_DONTWAIT | MSG_NOSIGNAL));
 			if (-1 == ios) { /* Error happen. */
 				/* Supress some errors. */
-				error = IO_NET_ERR_FILTER(errno);
+				error = SKT_ERR_FILTER(errno);
 				goto error_on_send;
 			}
 			LOGD_EV_FMT("HTTP hdr: %zu", ios);
@@ -873,7 +878,7 @@ error_on_send:
 #define P_MPGV		0x20 /* MPEG video */
 
 static int
-str_src_recv_mc_cb(io_task_p iotask, int error, uint32_t eof __unused,
+str_src_recv_mc_cb(tp_task_p tptask, int error, uint32_t eof __unused,
     size_t data2transfer_size, void *arg) {
 	str_hub_p str_hub = arg;
 	uintptr_t ident;
@@ -885,7 +890,7 @@ str_src_recv_mc_cb(io_task_p iotask, int error, uint32_t eof __unused,
 err_out:
 		LOG_ERR(error, "on receive");
 		str_hub_destroy_int(str_hub);
-		return (IO_TASK_CB_NONE); /* Receiver destroyed. */
+		return (TP_TASK_CB_NONE); /* Receiver destroyed. */
 	}
 	if (NULL == str_hub->r_buf) { /* Delay ring buf allocation. */
 		error = str_src_r_buf_alloc(str_hub);
@@ -893,7 +898,7 @@ err_out:
 			goto err_out;
 	}
 
-	ident = io_task_ident_get(iotask);
+	ident = tp_task_ident_get(tptask);
 	req_buf_size = STR_SRC_UDP_PKT_SIZE_STD;
 	while (transfered_size < data2transfer_size) { /* recv loop. */
 		buf_size = r_buf_wbuf_get(str_hub->r_buf, req_buf_size, &buf);
@@ -902,7 +907,7 @@ err_out:
 			error = errno;
 			if (0 == error)
 				error = EINVAL;
-			error = IO_NET_ERR_FILTER(error);
+			error = SKT_ERR_FILTER(error);
 			if (0 == error && STR_SRC_UDP_PKT_SIZE_MAX > buf_size) {
 				/* Possible not enough buf space. */
 				req_buf_size = STR_SRC_UDP_PKT_SIZE_MAX;
@@ -939,7 +944,7 @@ err_out:
 	}
 	/* Calc speed. */
 	str_hub->received_count += transfered_size;
-	thrpt_gettimev(str_hub->thrpt, 0, &str_hub->tp_last_recv);
+	clock_gettime(CLOCK_MONOTONIC_FAST, &str_hub->tp_last_recv);
 	
 #ifdef __linux__ /* Linux specific code. */
 	/* Ring buf LOWAT emulator. */
@@ -951,7 +956,7 @@ err_out:
 	str_hub_send_to_clients(str_hub);
 
 rcv_next:
-	return (IO_TASK_CB_CONTINUE);
+	return (TP_TASK_CB_CONTINUE);
 }
 
 
@@ -962,8 +967,8 @@ str_src_r_buf_alloc(str_hub_p str_hub) {
 	struct timespec tv_now;
 
 	/* Create buf */
-	thrpt_gettimev(str_hub->thrpt, 0, &tv_now);
-	md5_get_digest_strA((char*)&tv_now, sizeof(tv_now), (char*)hash);
+	clock_gettime(CLOCK_MONOTONIC_FAST, &tv_now);
+	md5_get_digest_str((char*)&tv_now, sizeof(tv_now), (char*)hash);
 	snprintf(filename, sizeof(filename), "/tmp/msd-%zu-%s.tmp",
 	    (size_t)getpid(), hash);
 	str_hub->r_buf_fd = (uintptr_t)open(filename, (O_CREAT | O_EXCL | O_RDWR), 0600);

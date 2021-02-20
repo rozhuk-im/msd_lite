@@ -1,0 +1,3 @@
+[submodule "src/liblcb"]
+	path = src/liblcb
+	url = https://github.com/rozhuk-im/liblcb.git
