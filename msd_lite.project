@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeLite_Project Name="msd_lite" InternalType="" Version="11000">
+  <VirtualDirectory Name="conf">
+    <File Name="conf/msd_lite.conf"/>
+  </VirtualDirectory>
+  <VirtualDirectory Name="root">
+    <File Name="config.h.cmake"/>
+    <File Name="README.md"/>
+    <File Name="dist.sh"/>
+    <File Name="CMakeLists.txt"/>
+    <File Name="ChangeLog"/>
+  </VirtualDirectory>
+  <Plugins>
+    <Plugin Name="CppCheck"/>
+    <Plugin Name="CMakePlugin">
+      <![CDATA[[{
+  "name": "Debug",
+  "enabled": false,
+  "buildDirectory": "build",
+  "sourceDirectory": "$(ProjectPath)",
+  "generator": "",
+  "buildType": "",
+  "arguments": [],
+  "parentProject": ""
+ }, {
+  "name": "Release",
+  "enabled": false,
+  "buildDirectory": "build",
+  "sourceDirectory": "$(ProjectPath)",
+  "generator": "",
+  "buildType": "",
+  "arguments": [],
+  "parentProject": ""
+ }]]]>
+    </Plugin>
+  </Plugins>
+  <Description/>
+  <Dependencies/>
+  <VirtualDirectory Name="src">
+    <File Name="src/CMakeLists.txt"/>
+    <VirtualDirectory Name="liblcb">
+      <VirtualDirectory Name="src">
+        <VirtualDirectory Name="net">
+          <File Name="src/liblcb/src/net/socket_options.c"/>
+          <File Name="src/liblcb/src/net/socket.c"/>
+          <File Name="src/liblcb/src/net/socket_address.c"/>
+          <File Name="src/liblcb/src/net/utils.c"/>
+        </VirtualDirectory>
+        <VirtualDirectory Name="proto">
+          <File Name="src/liblcb/src/proto/http.c"/>
+          <File Name="src/liblcb/src/proto/http_server.c"/>
+        </VirtualDirectory>
+        <VirtualDirectory Name="threadpool">
+          <File Name="src/liblcb/src/threadpool/threadpool.c"/>
+          <File Name="src/liblcb/src/threadpool/threadpool_msg_sys.c"/>
+          <File Name="src/liblcb/src/threadpool/threadpool_task.c"/>
+        </VirtualDirectory>
+        <VirtualDirectory Name="utils">
+          <File Name="src/liblcb/src/utils/info.c"/>
+          <File Name="src/liblcb/src/utils/log.c"/>
+          <File Name="src/liblcb/src/utils/ring_buffer.c"/>
+          <File Name="src/liblcb/src/utils/xml.c"/>
+          <File Name="src/liblcb/src/utils/cmd_line_daemon.c"/>
+          <File Name="src/liblcb/src/utils/sys_res_limits_xml.c"/>
+          <File Name="src/liblcb/src/utils/buf_str.c"/>
+          <File Name="src/liblcb/src/utils/sys.c"/>
+        </VirtualDirectory>
+      </VirtualDirectory>
+      <VirtualDirectory Name="include">
+        <VirtualDirectory Name="net">
+          <File Name="src/liblcb/include/net/host_address.h"/>
+          <File Name="src/liblcb/include/net/hostname_list.h"/>
+          <File Name="src/liblcb/include/net/socket.h"/>
+          <File Name="src/liblcb/include/net/socket_address.h"/>
+          <File Name="src/liblcb/include/net/utils.h"/>
+        </VirtualDirectory>
+        <VirtualDirectory Name="proto">
+          <File Name="src/liblcb/include/proto/http.h"/>
+          <File Name="src/liblcb/include/proto/http_server.h"/>
+          <File Name="src/liblcb/include/proto/mpeg2ts.h"/>
+          <File Name="src/liblcb/include/proto/rtp.h"/>
+        </VirtualDirectory>
+        <VirtualDirectory Name="threadpool">
+          <File Name="src/liblcb/include/threadpool/threadpool.h"/>
+          <File Name="src/liblcb/include/threadpool/threadpool_msg_sys.h"/>
+          <File Name="src/liblcb/include/threadpool/threadpool_task.h"/>
+        </VirtualDirectory>
+        <VirtualDirectory Name="utils">
+          <File Name="src/liblcb/include/utils/hash_bucket.h"/>
+          <File Name="src/liblcb/include/utils/info.h"/>
+          <File Name="src/liblcb/include/utils/io_buf.h"/>
+          <File Name="src/liblcb/include/utils/log.h"/>
+          <File Name="src/liblcb/include/utils/macro.h"/>
+          <File Name="src/liblcb/include/utils/mem_utils.h"/>
+          <File Name="src/liblcb/include/utils/ring_buffer.h"/>
+          <File Name="src/liblcb/include/utils/str2num.h"/>
+          <File Name="src/liblcb/include/utils/strh2num.h"/>
+          <File Name="src/liblcb/include/utils/xml.h"/>
+          <File Name="src/liblcb/include/utils/cmd_line_daemon.h"/>
+          <File Name="src/liblcb/include/utils/sys_res_limits_xml.h"/>
+        </VirtualDirectory>
+      </VirtualDirectory>
+    </VirtualDirectory>
+    <File Name="src/msd_lite.c"/>
+    <File Name="src/msd_lite_stat_text.c"/>
+    <File Name="src/msd_lite_stat_text.h"/>
+    <File Name="src/stream_sys.c"/>
+    <File Name="src/stream_sys.h"/>
+  </VirtualDirectory>
+  <Dependencies Name="Debug"/>
+  <Dependencies Name="Release"/>
+  <Settings Type="Executable">
+    <GlobalSettings>
+      <Compiler Options="" C_Options="-fsanitize=safe-stack;-D_FORTIFY_SOURCE=2;-fstack-protector;-fPIE;-fomit-frame-pointer;-DTHREAD_POOL_SETTINGS_XML;-DHTTP_SRV_XML_CONFIG;-DSOCKET_XML_CONFIG;-DMPEG2TS_XML_CONFIG;-DHAVE_PIPE2;-DHAVE_ACCEPT4;-DHAVE_MEMRCHR;-DHAVE_MEMMEM;-DHAVE_REALLOCARRAY;-DHAVE_MEMSET_S;-DHAVE_EXPLICIT_BZERO;-DHAVE_STRLCPY" Assembler="">
+        <IncludePath Value="$(IntermediateDirectory)"/>
+        <IncludePath Value="../"/>
+        <IncludePath Value="../src"/>
+        <IncludePath Value="./src/liblcb/include"/>
+      </Compiler>
+      <Linker Options="-fsanitize=safe-stack">
+        <Library Value="pthread"/>
+      </Linker>
+      <ResourceCompiler Options=""/>
+    </GlobalSettings>
+    <Configuration Name="Debug" CompilerType="clang system" DebuggerType="GNU gdb debugger" Type="Executable" BuildCmpWithGlobalSettings="append" BuildLnkWithGlobalSettings="append" BuildResWithGlobalSettings="append">
+      <Compiler Options="-g -DDEBUG" C_Options="-Weverything;-Wwrite-strings;-Wsign-compare;-Wpointer-arith;-Wnested-externs;-Wmissing-prototypes;-Wmissing-declarations;-Winline;-Wmain;-Wformat-security;-Wformat;-Wchar-subscripts;-Wcast-align;-g -DDEBUG;-W;-Wall;-Wno-gnu-zero-variadic-macro-arguments;-Wno-variadic-macros;-Wno-padded;-Wno-packed;-Wno-unused-macros;-Wno-format-nonliteral;-Wno-cast-qual;-Wno-reserved-id-macro;-Wno-date-time;-Wno-unused-local-typedef;-Wno-documentation-unknown-command;-Wno-thread-safety-analysis;-Wimplicit-fallthrough" Assembler="" Required="yes" PreCompiledHeader="" PCHInCommandLine="no" PCHFlags="" PCHFlagsPolicy="0"/>
+      <Linker Options="" Required="yes"/>
+      <ResourceCompiler Options="" Required="no"/>
+      <General OutputFile="$(IntermediateDirectory)/$(ProjectName)" IntermediateDirectory="$(ProjectPath)/build/src/" Command="$(OutputFile)" CommandArguments="-v -c /home/rim/docs/Progs/msd/msd_lite/msd_lite.conf" UseSeparateDebugArgs="no" DebugArguments="" WorkingDirectory="$(IntermediateDirectory)" PauseExecWhenProcTerminates="yes" IsGUIProgram="no" IsEnabled="yes"/>
+      <BuildSystem Name="Default"/>
+      <Environment EnvVarSetName="&lt;Use Defaults&gt;" DbgSetName="&lt;Use Defaults&gt;">
+        <![CDATA[]]>
+      </Environment>
+      <Debugger IsRemote="no" RemoteHostName="" RemoteHostPort="" DebuggerPath="" IsExtended="no">
+        <DebuggerSearchPaths/>
+        <PostConnectCommands/>
+        <StartupCommands/>
+      </Debugger>
+      <PreBuild>
+        <Command Enabled="yes">mkdir -p $(IntermediateDirectory)</Command>
+        <Command Enabled="yes">echo '#define PACKAGE_NAME "msd_lite"' &gt; $(IntermediateDirectory)/config.h</Command>
+        <Command Enabled="yes">echo '#define PACKAGE_VERSION "1.0.0"' &gt;&gt; $(IntermediateDirectory)/config.h</Command>
+        <Command Enabled="yes">echo '#define PACKAGE_DESCRIPTION "Multi stream daemon lite"' &gt;&gt; $(IntermediateDirectory)/config.h</Command>
+        <Command Enabled="yes">echo '#define PACKAGE_URL "https://github.com/rozhuk-im/msd_lite"' &gt;&gt; $(IntermediateDirectory)/config.h</Command>
+        <Command Enabled="yes">echo '#define PACKAGE_STRING PACKAGE_NAME" "PACKAGE_VERSION' &gt;&gt; $(IntermediateDirectory)/config.h</Command>
+      </PreBuild>
+      <PostBuild/>
+      <CustomBuild Enabled="no">
+        <RebuildCommand>./configure --enable-debug
+make clean
+make</RebuildCommand>
+        <CleanCommand>make clean</CleanCommand>
+        <BuildCommand>./configure --enable-debug
+make</BuildCommand>
+        <PreprocessFileCommand/>
+        <SingleFileCommand/>
+        <MakefileGenerationCommand/>
+        <ThirdPartyToolName>None</ThirdPartyToolName>
+        <WorkingDirectory>$(ProjectPath)</WorkingDirectory>
+      </CustomBuild>
+      <AdditionalRules>
+        <CustomPostBuild/>
+        <CustomPreBuild/>
+      </AdditionalRules>
+      <Completion EnableCpp11="no" EnableCpp14="no">
+        <ClangCmpFlagsC/>
+        <ClangCmpFlags/>
+        <ClangPP/>
+        <SearchPaths/>
+      </Completion>
+    </Configuration>
+    <Configuration Name="Release" CompilerType="clang system" DebuggerType="GNU gdb debugger" Type="Executable" BuildCmpWithGlobalSettings="append" BuildLnkWithGlobalSettings="append" BuildResWithGlobalSettings="append">
+      <Compiler Options="" C_Options="" Assembler="" Required="yes" PreCompiledHeader="" PCHInCommandLine="no" PCHFlags="" PCHFlagsPolicy="0">
+        <IncludePath Value="."/>
+      </Compiler>
+      <Linker Options="-O2" Required="yes"/>
+      <ResourceCompiler Options="" Required="no"/>
+      <General OutputFile="$(IntermediateDirectory)/$(ProjectName)" IntermediateDirectory="$(ProjectPath)/build/src/" Command="$(OutputFile)" CommandArguments="" UseSeparateDebugArgs="no" DebugArguments="" WorkingDirectory="$(IntermediateDirectory)" PauseExecWhenProcTerminates="yes" IsGUIProgram="no" IsEnabled="yes"/>
+      <BuildSystem Name="Default"/>
+      <Environment EnvVarSetName="&lt;Use Defaults&gt;" DbgSetName="&lt;Use Defaults&gt;">
+        <![CDATA[]]>
+      </Environment>
+      <Debugger IsRemote="no" RemoteHostName="" RemoteHostPort="" DebuggerPath="" IsExtended="no">
+        <DebuggerSearchPaths/>
+        <PostConnectCommands/>
+        <StartupCommands/>
+      </Debugger>
+      <PreBuild/>
+      <PostBuild/>
+      <CustomBuild Enabled="yes">
+        <RebuildCommand/>
+        <CleanCommand>rm -rf build</CleanCommand>
+        <BuildCommand>mkdir build
+cd build
+cmake -G Ninja -D CMAKE_VERBOSE_MAKEFILE=true ..
+cmake --build . -- -j`getconf NPROCESSORS_ONLN`
+</BuildCommand>
+        <PreprocessFileCommand/>
+        <SingleFileCommand/>
+        <MakefileGenerationCommand/>
+        <ThirdPartyToolName>None</ThirdPartyToolName>
+        <WorkingDirectory>$(ProjectPath)</WorkingDirectory>
+      </CustomBuild>
+      <AdditionalRules>
+        <CustomPostBuild/>
+        <CustomPreBuild/>
+      </AdditionalRules>
+      <Completion EnableCpp11="no" EnableCpp14="no">
+        <ClangCmpFlagsC/>
+        <ClangCmpFlags/>
+        <ClangPP/>
+        <SearchPaths/>
+      </Completion>
+    </Configuration>
+  </Settings>
+</CodeLite_Project>
