@@ -988,7 +988,7 @@ str_src_r_buf_alloc(str_hub_p str_hub) {
 		goto err_out;
 	}
 	str_hub->r_buf = r_buf_alloc(str_hub->r_buf_fd, str_hub->shbskt->hub_params.ring_buf_size,
-	    1024/*MPEG2_TS_PKT_SIZE_188*/);
+	    MPEG2_TS_PKT_SIZE_188);
 	if (NULL == str_hub->r_buf) {
 		error = errno;
 		LOGD_ERR(error, "r_buf_alloc()");
