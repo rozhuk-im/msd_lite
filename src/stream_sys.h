@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012 - 2021 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2012-2023 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -114,6 +114,7 @@ typedef struct str_src_conn_udp_s {
 typedef struct str_src_conn_mc_s {
 	str_src_conn_udp_t udp;
 	uint32_t	if_index;
+	uint32_t	rejoin_time;
 } str_src_conn_mc_t, *str_src_conn_mc_p;
 #define STR_SRC_CONN_DEF_IFINDEX	((uint32_t)-1)
 
@@ -160,6 +161,7 @@ typedef struct str_hub_s {
 #ifdef __linux__ /* Linux specific code. */
 	size_t		r_buf_rcvd;	/* Ring buf LOWAT emulator. */
 #endif /* Linux specific code. */
+	time_t		next_rejoin_time; /* Next time to send leave+join. */
 
 	tpt_p		tpt;		/* Thread data for all IO operations. */
 	str_src_conn_params_t src_conn_params;	/* Point to str_src_conn_XXX */

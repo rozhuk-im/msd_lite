@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012 - 2021 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2012-2023 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -121,7 +121,8 @@ int		msd_http_srv_hub_attach(http_srv_cli_p cli,
 		    uint8_t *hub_name, size_t hub_name_size,
 		    str_src_conn_params_p src_conn_params);
 uint32_t	msd_http_req_url_parse(http_srv_req_p req,
-		    struct sockaddr_storage *ssaddr, uint32_t *if_index,
+		    struct sockaddr_storage *ssaddr,
+		    uint32_t *if_index, uint32_t *rejoin_time,
 		    uint8_t *hub_name, size_t hub_name_size,
 		    size_t *hub_name_size_ret);
 
@@ -270,6 +271,9 @@ msd_src_conn_profile_load(const uint8_t *data, size_t data_size, void *conn) {
 		if_name[MIN(IFNAMSIZ, tm)] = 0;
 		((str_src_conn_mc_p)conn)->if_index = if_nametoindex(if_name);
 	}
+	xml_get_val_uint32_args(data, data_size, NULL,
+	    &((str_src_conn_mc_p)conn)->rejoin_time,
+	    (const uint8_t*)"multicast", "rejoinTime", NULL);
 
 	return (0);
 }
@@ -527,11 +531,11 @@ msd_http_srv_hub_attach(http_srv_cli_p cli, uint8_t *hub_name, size_t hub_name_s
 
 uint32_t
 msd_http_req_url_parse(http_srv_req_p req, struct sockaddr_storage *ssaddr,
-    uint32_t *if_index,
+    uint32_t *if_index, uint32_t *rejoin_time,
     uint8_t *hub_name, size_t hub_name_size, size_t *hub_name_size_ret) {
 	const uint8_t *ptm;
 	size_t tm;
-	uint32_t ifindex;
+	uint32_t ifindex, rejointime;
 	char straddr[STR_ADDR_LEN], ifname[(IFNAMSIZ + 1)];
 	struct sockaddr_storage ss;
 
@@ -568,6 +572,19 @@ msd_http_req_url_parse(http_srv_req_p req, struct sockaddr_storage *ssaddr,
 		if_indextoname(ifindex, ifname);
 	}
 
+	/* rejoin_time. */
+	if (0 == http_query_val_get(req->line.query, 
+	    req->line.query_size, (const uint8_t*)"rejoin_time", 11,
+	    &ptm, &tm)) {
+		rejointime = ustr2u32(ptm, tm);
+	} else { /* Default value. */
+		if (NULL != if_index) {
+			rejointime = (*rejoin_time);
+		} else {
+			rejointime = 0;
+		}
+	}
+
 	if (0 != sa_addr_port_to_str(&ss, straddr, sizeof(straddr), NULL))
 		return (400);
 	tm = (size_t)snprintf((char*)hub_name, hub_name_size,
@@ -577,6 +594,9 @@ msd_http_req_url_parse(http_srv_req_p req, struct sockaddr_storage *ssaddr,
 	}
 	if (NULL != if_index) {
 		(*if_index) = ifindex;
+	}
+	if (NULL != rejoin_time) {
+		(*rejoin_time) = rejointime;
 	}
 	if (NULL != hub_name_size_ret) {
 		(*hub_name_size_ret) = tm;
@@ -647,8 +667,11 @@ msd_http_srv_on_req_rcv_cb(http_srv_cli_p cli, void *udata __unused,
 		/* Default value. */
 		memcpy(&src_conn_params, &g_data.src_conn_params, sizeof(str_src_conn_mc_t));
 		/* Get multicast address, ifindex, hub name. */
-		resp->status_code = msd_http_req_url_parse(req, &src_conn_params.udp.addr,
-		    &src_conn_params.mc.if_index, buf, sizeof(buf), &buf_size);
+		resp->status_code = msd_http_req_url_parse(req,
+		    &src_conn_params.udp.addr,
+		    &src_conn_params.mc.if_index,
+		    &src_conn_params.mc.rejoin_time,
+		    buf, sizeof(buf), &buf_size);
 		if (200 != resp->status_code)
 			return (HTTP_SRV_CB_CONTINUE);
 		if (HTTP_REQ_METHOD_HEAD == req->line.method_code) {

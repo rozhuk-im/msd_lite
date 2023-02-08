@@ -4,7 +4,7 @@
 [![Build-Ubuntu-latest Actions Status](https://github.com/rozhuk-im/msd_lite/workflows/build-ubuntu-latest/badge.svg)](https://github.com/rozhuk-im/msd_lite/actions)
 
 
-Rozhuk Ivan <rozhuk.im@gmail.com> 2011 - 2021
+Rozhuk Ivan <rozhuk.im@gmail.com> 2011 - 2023
 
 msd_lite - Multi stream daemon lite.
 This lightweight version of Multi Stream daemon (msd)

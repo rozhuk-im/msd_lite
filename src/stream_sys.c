@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012 - 2021 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2012-2023 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -168,6 +168,7 @@ str_src_conn_def(str_src_conn_params_p src_conn_params) {
 		return;
 	mem_bzero(src_conn_params, sizeof(str_src_conn_params_t));
 	src_conn_params->mc.if_index = STR_SRC_CONN_DEF_IFINDEX;
+	src_conn_params->mc.rejoin_time = 0;
 }
 
 
@@ -376,6 +377,7 @@ str_hubs_bckt_stat_summary(str_hubs_bckt_p shbskt, str_hubs_stat_p stat) {
 void
 str_hubs_bckt_timer_service(str_hubs_bckt_p shbskt, str_hub_p str_hub,
     str_hubs_stat_p stat) {
+	int error;
 	str_src_settings_p src_params = &shbskt->src_params;
 	struct timespec *tp = &shbskt->tp_last_tmr_next;
 	uint64_t tm64;
@@ -413,6 +415,17 @@ str_hubs_bckt_timer_service(str_hubs_bckt_p shbskt, str_hub_p str_hub,
 		    (tmt == tp->tv_sec && str_hub->tp_last_recv.tv_nsec < tp->tv_nsec)) {
 			str_hub_destroy_int(str_hub);
 			return;
+		}
+	}
+	/* Re join multicast group timer. */
+	if (0 != str_hub->src_conn_params.mc.rejoin_time &&
+	    str_hub->next_rejoin_time < tp->tv_sec) {
+		str_hub->next_rejoin_time = (tp->tv_sec + (time_t)str_hub->src_conn_params.mc.rejoin_time);
+		for (int join = 0; join < 2; join ++) {
+		    error = skt_mc_join(tp_task_ident_get(str_hub->tptask), join,
+			str_hub->src_conn_params.mc.if_index,
+			&str_hub->src_conn_params.mc.udp.addr);
+		    LOG_ERR(error, "skt_mc_join()");
 		}
 	}
 }
