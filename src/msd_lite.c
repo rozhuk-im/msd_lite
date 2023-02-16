@@ -111,12 +111,6 @@ int		msd_src_conn_profile_load(const uint8_t *data, size_t data_size,
 
 
 
-typedef struct msd_cli_udata_s {
-	uint8_t		*user_agent;
-	size_t		user_agent_size;
-	struct sockaddr_storage	xreal_addr;
-} msd_cli_udata_t, *msd_cli_udata_p;
-
 int		msd_http_srv_hub_attach(http_srv_cli_p cli,
 		    uint8_t *hub_name, size_t hub_name_size,
 		    str_src_conn_params_p src_conn_params);
