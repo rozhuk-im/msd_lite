@@ -286,7 +286,6 @@ str_hubs_bckt_destroy(str_hubs_bckt_p shbskt) {
 	    str_hubs_bckt_destroy_msg_cb, shbskt);
 
 	free(shbskt->thr_data);
-	mem_filld(shbskt, sizeof(str_hubs_bckt_t));
 	free(shbskt);
 }
 static void
@@ -568,8 +567,6 @@ str_hub_destroy_int(str_hub_p str_hub) {
 	LOG_INFO_FMT("%s: Destroyed.", str_hub->name);
 
 	str_src_r_buf_free(str_hub);
-
-	mem_filld(str_hub, (sizeof(str_hub_t) + str_hub->name_size));
 	free(str_hub);
 }
 
@@ -640,7 +637,6 @@ str_hub_cli_destroy(str_hub_p str_hub, str_hub_cli_p strh_cli) {
 	}
 
 	close((int)strh_cli->skt);
-	mem_filld(strh_cli, sizeof(str_hub_cli_t));
 	free(strh_cli);
 }
 

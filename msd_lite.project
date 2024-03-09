@@ -1,15 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CodeLite_Project Name="msd_lite" InternalType="" Version="11000">
-  <VirtualDirectory Name="conf">
-    <File Name="conf/msd_lite.conf"/>
-  </VirtualDirectory>
-  <VirtualDirectory Name="root">
-    <File Name="config.h.cmake"/>
-    <File Name="README.md"/>
-    <File Name="dist.sh"/>
-    <File Name="CMakeLists.txt"/>
-    <File Name="ChangeLog"/>
-  </VirtualDirectory>
   <Plugins>
     <Plugin Name="CppCheck"/>
     <Plugin Name="CMakePlugin">
@@ -34,6 +24,16 @@
  }]]]>
     </Plugin>
   </Plugins>
+  <VirtualDirectory Name="conf">
+    <File Name="conf/msd_lite.conf"/>
+  </VirtualDirectory>
+  <VirtualDirectory Name="root">
+    <File Name="readme.md"/>
+    <File Name="config.h.cmake"/>
+    <File Name="dist.sh"/>
+    <File Name="CMakeLists.txt"/>
+    <File Name="ChangeLog"/>
+  </VirtualDirectory>
   <Description/>
   <Dependencies/>
   <VirtualDirectory Name="src">
@@ -123,7 +123,7 @@
       <ResourceCompiler Options=""/>
     </GlobalSettings>
     <Configuration Name="Debug" CompilerType="clang system" DebuggerType="GNU gdb debugger" Type="Executable" BuildCmpWithGlobalSettings="append" BuildLnkWithGlobalSettings="append" BuildResWithGlobalSettings="append">
-      <Compiler Options="-g -DDEBUG" C_Options="-Weverything;-Wwrite-strings;-Wsign-compare;-Wpointer-arith;-Wnested-externs;-Wmissing-prototypes;-Wmissing-declarations;-Winline;-Wmain;-Wformat-security;-Wformat;-Wchar-subscripts;-Wcast-align;-g -DDEBUG;-W;-Wall;-Wno-gnu-zero-variadic-macro-arguments;-Wno-variadic-macros;-Wno-padded;-Wno-packed;-Wno-unused-macros;-Wno-format-nonliteral;-Wno-cast-qual;-Wno-reserved-id-macro;-Wno-date-time;-Wno-unused-local-typedef;-Wno-documentation-unknown-command;-Wno-thread-safety-analysis;-Wimplicit-fallthrough" Assembler="" Required="yes" PreCompiledHeader="" PCHInCommandLine="no" PCHFlags="" PCHFlagsPolicy="0"/>
+      <Compiler Options="-g -DDEBUG" C_Options="-ftrapv;-g -DDEBUG;-O0;-fwrapv;-fstack-protector-all;-Wall;-g3 -ggdb;-Wno-reserved-id-macro;-Wno-gnu-zero-variadic-macro-arguments;-Wno-variadic-macros;-Wno-documentation;-Wno-documentation-unknown-command;-Wno-padded;-Wno-cast-qual;-Wno-cast-function-type-strict;-Wno-reserved-identifier;-Wno-unsafe-buffer-usage" Assembler="" Required="yes" PreCompiledHeader="" PCHInCommandLine="no" PCHFlags="" PCHFlagsPolicy="0"/>
       <Linker Options="" Required="yes"/>
       <ResourceCompiler Options="" Required="no"/>
       <General OutputFile="$(IntermediateDirectory)/$(ProjectName)" IntermediateDirectory="$(ProjectPath)/build/src/" Command="$(OutputFile)" CommandArguments="-v -c /home/rim/docs/Progs/msd/msd_lite/msd_lite.conf" UseSeparateDebugArgs="no" DebugArguments="" WorkingDirectory="$(IntermediateDirectory)" PauseExecWhenProcTerminates="yes" IsGUIProgram="no" IsEnabled="yes"/>
@@ -175,7 +175,7 @@ make</BuildCommand>
       </Compiler>
       <Linker Options="-O2" Required="yes"/>
       <ResourceCompiler Options="" Required="no"/>
-      <General OutputFile="$(IntermediateDirectory)/$(ProjectName)" IntermediateDirectory="$(ProjectPath)/build/src/" Command="$(OutputFile)" CommandArguments="" UseSeparateDebugArgs="no" DebugArguments="" WorkingDirectory="$(IntermediateDirectory)" PauseExecWhenProcTerminates="yes" IsGUIProgram="no" IsEnabled="yes"/>
+      <General OutputFile="$(IntermediateDirectory)/src/$(ProjectName)" IntermediateDirectory="$(ProjectPath)/$(ConfigurationName)" Command="$(OutputFile)" CommandArguments="" UseSeparateDebugArgs="no" DebugArguments="" WorkingDirectory="$(IntermediateDirectory)" PauseExecWhenProcTerminates="yes" IsGUIProgram="no" IsEnabled="yes"/>
       <BuildSystem Name="Default"/>
       <Environment EnvVarSetName="&lt;Use Defaults&gt;" DbgSetName="&lt;Use Defaults&gt;">
         <![CDATA[]]>
@@ -188,18 +188,24 @@ make</BuildCommand>
       <PreBuild/>
       <PostBuild/>
       <CustomBuild Enabled="yes">
-        <RebuildCommand/>
-        <CleanCommand>rm -rf build</CleanCommand>
-        <BuildCommand>mkdir build
-cd build
-cmake -G Ninja -D CMAKE_VERBOSE_MAKEFILE=true ..
-cmake --build . -- -j`getconf NPROCESSORS_ONLN`
+        <Target Name="Configure">mkdir $(ProjectPath)/$(ConfigurationName) &amp;&amp;
+cd $(ProjectPath)/$(ConfigurationName) &amp;&amp;
+cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=true -DENABLE_ALSA=true ..
+</Target>
+        <RebuildCommand>rm -rf $(ProjectPath)/$(ConfigurationName) &amp;&amp;
+mkdir $(ProjectPath)/$(ConfigurationName) &amp;&amp;
+cd $(ProjectPath)/$(ConfigurationName) &amp;&amp;
+cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=true -DENABLE_ALSA=true .. &amp;&amp;
+make -C $(ProjectPath)/$(ConfigurationName) -j`getconf NPROCESSORS_ONLN`
+</RebuildCommand>
+        <CleanCommand>rm -rf $(ProjectPath)/$(ConfigurationName)</CleanCommand>
+        <BuildCommand>make -C $(ProjectPath)/$(ConfigurationName) -j`getconf NPROCESSORS_ONLN`
 </BuildCommand>
         <PreprocessFileCommand/>
         <SingleFileCommand/>
         <MakefileGenerationCommand/>
         <ThirdPartyToolName>None</ThirdPartyToolName>
-        <WorkingDirectory>$(ProjectPath)</WorkingDirectory>
+        <WorkingDirectory>$(WorkspacePath)</WorkingDirectory>
       </CustomBuild>
       <AdditionalRules>
         <CustomPostBuild/>

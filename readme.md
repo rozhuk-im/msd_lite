@@ -16,6 +16,13 @@ BSD licence.
 Website: http://www.netlab.linkpc.net/wiki/en:software:msd:lite
 
 
+## Donate
+Support the author
+* **Buy Me A Coffee:** [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/rojuc) <br/>
+* **PayPal:** [![PayPal](https://srv-cdn.himpfen.io/badges/paypal/paypal-flat.svg)](https://paypal.me/rojuc) <br/>
+* **Bitcoin (BTC):** `1AxYyMWek5vhoWWRTWKQpWUqKxyfLarCuz` <br/>
+
+
 ## Features
 * Open source
 * BSD License
