@@ -17,7 +17,6 @@ set(MSD_LITE_BIN	msd_lite.c
 			liblcb/src/utils/buf_str.c
 			liblcb/src/utils/info.c
 			liblcb/src/utils/ring_buffer.c
-			liblcb/src/utils/log.c
 			liblcb/src/utils/xml.c)
 
 add_executable(msd_lite ${MSD_LITE_BIN})

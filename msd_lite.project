@@ -57,7 +57,6 @@
         </VirtualDirectory>
         <VirtualDirectory Name="utils">
           <File Name="src/liblcb/src/utils/info.c"/>
-          <File Name="src/liblcb/src/utils/log.c"/>
           <File Name="src/liblcb/src/utils/ring_buffer.c"/>
           <File Name="src/liblcb/src/utils/xml.c"/>
           <File Name="src/liblcb/src/utils/cmd_line_daemon.c"/>
@@ -89,7 +88,6 @@
           <File Name="src/liblcb/include/utils/hash_bucket.h"/>
           <File Name="src/liblcb/include/utils/info.h"/>
           <File Name="src/liblcb/include/utils/io_buf.h"/>
-          <File Name="src/liblcb/include/utils/log.h"/>
           <File Name="src/liblcb/include/utils/macro.h"/>
           <File Name="src/liblcb/include/utils/mem_utils.h"/>
           <File Name="src/liblcb/include/utils/ring_buffer.h"/>
@@ -126,7 +124,7 @@
       <Compiler Options="-g -DDEBUG" C_Options="-ftrapv;-g -DDEBUG;-O0;-fwrapv;-fstack-protector-all;-Wall;-g3 -ggdb;-Wno-reserved-id-macro;-Wno-gnu-zero-variadic-macro-arguments;-Wno-variadic-macros;-Wno-documentation;-Wno-documentation-unknown-command;-Wno-padded;-Wno-cast-qual;-Wno-cast-function-type-strict;-Wno-reserved-identifier;-Wno-unsafe-buffer-usage" Assembler="" Required="yes" PreCompiledHeader="" PCHInCommandLine="no" PCHFlags="" PCHFlagsPolicy="0"/>
       <Linker Options="" Required="yes"/>
       <ResourceCompiler Options="" Required="no"/>
-      <General OutputFile="$(IntermediateDirectory)/$(ProjectName)" IntermediateDirectory="$(ProjectPath)/build/src/" Command="$(OutputFile)" CommandArguments="-v -c /home/rim/docs/Progs/msd/msd_lite/msd_lite.conf" UseSeparateDebugArgs="no" DebugArguments="" WorkingDirectory="$(IntermediateDirectory)" PauseExecWhenProcTerminates="yes" IsGUIProgram="no" IsEnabled="yes"/>
+      <General OutputFile="$(IntermediateDirectory)/$(ProjectName)" IntermediateDirectory="$(ProjectPath)/build/src/" Command="$(OutputFile)" CommandArguments="-v -c /home/rim/docs/Progs/msd/msd_lite/conf/msd_lite.conf" UseSeparateDebugArgs="no" DebugArguments="" WorkingDirectory="$(IntermediateDirectory)" PauseExecWhenProcTerminates="yes" IsGUIProgram="no" IsEnabled="yes"/>
       <BuildSystem Name="Default"/>
       <Environment EnvVarSetName="&lt;Use Defaults&gt;" DbgSetName="&lt;Use Defaults&gt;">
         <![CDATA[]]>
@@ -190,12 +188,12 @@ make</BuildCommand>
       <CustomBuild Enabled="yes">
         <Target Name="Configure">mkdir $(ProjectPath)/$(ConfigurationName) &amp;&amp;
 cd $(ProjectPath)/$(ConfigurationName) &amp;&amp;
-cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=true -DENABLE_ALSA=true ..
+cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=true ..
 </Target>
         <RebuildCommand>rm -rf $(ProjectPath)/$(ConfigurationName) &amp;&amp;
 mkdir $(ProjectPath)/$(ConfigurationName) &amp;&amp;
 cd $(ProjectPath)/$(ConfigurationName) &amp;&amp;
-cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=true -DENABLE_ALSA=true .. &amp;&amp;
+cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=true .. &amp;&amp;
 make -C $(ProjectPath)/$(ConfigurationName) -j`getconf NPROCESSORS_ONLN`
 </RebuildCommand>
         <CleanCommand>rm -rf $(ProjectPath)/$(ConfigurationName)</CleanCommand>

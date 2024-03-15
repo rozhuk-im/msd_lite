@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012 - 2021 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2012-2024 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -57,7 +57,6 @@
 #include "proto/http_server.h"
 #include "stream_sys.h"
 #include "utils/info.h"
-#include "utils/log.h"
 #include "msd_lite_stat_text.h"
 
 
