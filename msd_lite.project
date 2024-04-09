@@ -28,6 +28,7 @@
     <File Name="conf/msd_lite.conf"/>
   </VirtualDirectory>
   <VirtualDirectory Name="root">
+    <File Name=".editorconfig"/>
     <File Name="readme.md"/>
     <File Name="config.h.cmake"/>
     <File Name="dist.sh"/>
