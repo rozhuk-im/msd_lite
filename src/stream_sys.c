@@ -255,7 +255,7 @@ str_hubs_bckt_create(tp_p tp, const char *app_ver, str_hub_settings_p hub_params
 	shbskt->service_tmr.cb_func = str_hubs_bckt_timer_cb;
 	shbskt->service_tmr.ident = (uintptr_t)shbskt;
 	error = tpt_ev_add_args(tp_thread_get_rr(shbskt->tp), TP_EV_TIMER,
-	    0, 0, 1000 /* 1 sec. */, &shbskt->service_tmr);
+	    0, TP_FF_T_MSEC, 1000 /* 1 sec. */, &shbskt->service_tmr);
 	if (0 != error) {
 		SYSLOG_ERR(LOG_ERR, error, "tpt_ev_add_args().");
 		goto err_out;
@@ -273,13 +273,10 @@ err_out:
 
 void
 str_hubs_bckt_destroy(str_hubs_bckt_p shbskt) {
-	tp_event_t ev;
 
 	if (NULL == shbskt)
 		return;
-	memset(&ev, 0x00, sizeof(ev));
-	ev.event = TP_EV_TIMER;
-	tpt_ev_del(&ev, &shbskt->service_tmr);
+	tpt_ev_del_args1(TP_EV_TIMER, &shbskt->service_tmr);
 	/* Broadcast to all threads. */
 	tpt_msg_bsend(shbskt->tp, NULL,
 	    (TP_MSG_F_SELF_DIRECT | TP_MSG_F_FORCE | TP_MSG_F_FAIL_DIRECT | TP_BMSG_F_SYNC),
