@@ -21,6 +21,13 @@ set(PACKAGE_TARNAME		"${PACKAGE_NAME}-${PACKAGE_VERSION}")
 
 ############################# OPTIONS SECTION ##########################
 
+option(ENABLE_TESTS		"Enable tests [default: OFF]"		OFF)
+if (ENABLE_TESTS)
+	# Enable testing functionality.
+	enable_testing()
+	set(ENABLE_LIBLCB_TESTS TRUE)
+endif()
+
 # Now CMAKE_INSTALL_PREFIX is a base prefix for everything.
 if (NOT CONFDIR)
 	set(CONFDIR "${CMAKE_INSTALL_PREFIX}/etc/msd_lite")
@@ -234,11 +241,12 @@ add_definitions(-DHAVE_CONFIG_H)
 
 ################################ SUBDIRS SECTION #######################
 
-add_definitions(-DHTTP_SRV_XML_CONFIG)
-add_definitions(-DSOCKET_XML_CONFIG)
-add_definitions(-DTHREAD_POOL_SETTINGS_XML)
 include(src/liblcb/CMakeLists.txt)
 add_subdirectory(src)
+
+if (ENABLE_TESTS)
+	#add_subdirectory(tests)
+endif()
 
 ############################ TARGETS SECTION ###########################
 

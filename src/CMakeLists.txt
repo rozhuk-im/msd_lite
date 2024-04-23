@@ -20,6 +20,9 @@ set(MSD_LITE_BIN	msd_lite.c
 			liblcb/src/utils/xml.c)
 
 add_executable(msd_lite ${MSD_LITE_BIN})
+target_compile_definitions(msd_lite PRIVATE -DHTTP_SRV_XML_CONFIG)
+target_compile_definitions(msd_lite PRIVATE -DSOCKET_XML_CONFIG)
+target_compile_definitions(msd_lite PRIVATE -DTHREAD_POOL_SETTINGS_XML)
 set_target_properties(msd_lite PROPERTIES LINKER_LANGUAGE C)
 target_link_libraries(msd_lite ${CMAKE_REQUIRED_LIBRARIES} ${CMAKE_EXE_LINKER_FLAGS})
 
