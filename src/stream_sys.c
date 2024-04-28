@@ -142,7 +142,7 @@ str_hub_settings_def(str_hub_settings_p p_ret) {
 
 	if (NULL == p_ret)
 		return;
-	mem_bzero(p_ret, sizeof(str_hub_settings_t));
+	memset(p_ret, 0x00, sizeof(str_hub_settings_t));
 	p_ret->flags = STR_HUB_S_DEF_FLAGS;
 	p_ret->ring_buf_size = STR_HUB_S_DEF_RING_BUF_SIZE;
 	p_ret->precache = STR_HUB_S_DEF_PRECAHE;
@@ -155,7 +155,7 @@ str_src_settings_def(str_src_settings_p p_ret) {
 	
 	if (NULL == p_ret)
 		return;
-	mem_bzero(p_ret, sizeof(str_src_settings_t));
+	memset(p_ret, 0x00, sizeof(str_src_settings_t));
 	p_ret->skt_rcv_buf = STR_SRC_S_DEF_SKT_RCV_BUF;
 	p_ret->skt_rcv_lowat = STR_SRC_S_DEF_SKT_RCV_LOWAT;
 	p_ret->rcv_timeout = STR_SRC_S_DEF_UDP_RCV_TIMEOUT;
@@ -166,7 +166,7 @@ str_src_conn_def(str_src_conn_params_p src_conn_params) {
 
 	if (NULL == src_conn_params)
 		return;
-	mem_bzero(src_conn_params, sizeof(str_src_conn_params_t));
+	memset(src_conn_params, 0x00, sizeof(str_src_conn_params_t));
 	src_conn_params->mc.if_index = STR_SRC_CONN_DEF_IFINDEX;
 	src_conn_params->mc.rejoin_time = 0;
 }
@@ -182,11 +182,11 @@ str_hubs_bckt_create(tp_p tp, const char *app_ver, str_hub_settings_p hub_params
 
 	if (NULL == shbskt_ret)
 		return (EINVAL);
-	shbskt = zalloc(sizeof(str_hubs_bckt_t) + hub_params->cust_http_hdrs_size + sizeof(void*));
+	shbskt = calloc(1, sizeof(str_hubs_bckt_t) + hub_params->cust_http_hdrs_size + sizeof(void*));
 	if (NULL == shbskt)
 		return (ENOMEM);
 	thread_count_max = tp_thread_count_max_get(tp);
-	shbskt->thr_data = zalloc((sizeof(str_hub_thrd_t) * thread_count_max));
+	shbskt->thr_data = calloc(1, (sizeof(str_hub_thrd_t) * thread_count_max));
 	if (NULL == shbskt->thr_data) {
 		error = ENOMEM;
 		goto err_out;
@@ -359,7 +359,7 @@ str_hubs_bckt_stat_summary(str_hubs_bckt_p shbskt, str_hubs_stat_p stat) {
 	if (NULL == shbskt || NULL == stat)
 		return (EINVAL);
 	thread_cnt = tp_thread_count_max_get(shbskt->tp);
-	mem_bzero(stat, sizeof(str_hubs_stat_t));
+	memset(stat, 0x00, sizeof(str_hubs_stat_t));
 	for (i = 0; i < thread_cnt; i ++) {
 		stat->str_hub_count += shbskt->thr_data[i].stat.str_hub_count;
 		stat->cli_count += shbskt->thr_data[i].stat.cli_count;
@@ -435,7 +435,7 @@ str_hubs_bckt_timer_msg_cb(tpt_p tpt, void *udata) {
 
 	//SYSLOGD_EX(LOG_DEBUG, "...");
 	thread_num = tp_thread_get_num(tpt);
-	mem_bzero(&stat, sizeof(str_hubs_stat_t));
+	memset(&stat, 0x00, sizeof(str_hubs_stat_t));
 
 	/* Enum all Stream Hubs associated with this thread. */
 	TAILQ_FOREACH_SAFE(str_hub, &shbskt->thr_data[thread_num].hub_head, next,
@@ -473,7 +473,7 @@ str_hub_create_int(str_hubs_bckt_p shbskt, tpt_p tpt, uint8_t *name, size_t name
 
 	if (NULL == shbskt || NULL == name || 0 == name_size || NULL == str_hub_ret)
 		return (EINVAL);
-	str_hub = zalloc((sizeof(str_hub_t) + name_size + sizeof(void*)));
+	str_hub = calloc(1, (sizeof(str_hub_t) + name_size + sizeof(void*)));
 	if (NULL == str_hub)
 		return (ENOMEM);
 
@@ -577,7 +577,7 @@ str_hub_cli_alloc(uintptr_t skt, const char *ua, size_t ua_size) {
 
 	if (STR_HUB_CLI_USER_AGENT_MAX_SIZE < ua_size)
 		ua_size = STR_HUB_CLI_USER_AGENT_MAX_SIZE;
-	strh_cli = zalloc(sizeof(str_hub_cli_t) + ua_size + sizeof(void*));
+	strh_cli = calloc(1, sizeof(str_hub_cli_t) + ua_size + sizeof(void*));
 	if (NULL == strh_cli)
 		return (NULL);
 	/* Set. */
@@ -615,7 +615,7 @@ str_hub_cli_destroy(str_hub_p str_hub, str_hub_cli_p strh_cli) {
 	/* Send HTTP headers if needed. */
 	if (0 == (STR_HUB_CLI_STATE_F_HTTP_HDRS_SENDED & strh_cli->flags) &&
 	    0 == strh_cli->offset) {
-		mem_bzero(&mhdr, sizeof(mhdr));
+		memset(&mhdr, 0x00, sizeof(mhdr));
 		mhdr.msg_iov = (struct iovec*)iov;
 
 		iov[mhdr.msg_iovlen].iov_base = MK_RW_PTR("HTTP/1.1 503 Service Unavailable\r\n");
@@ -647,7 +647,7 @@ str_hub_cli_attach(str_hubs_bckt_p shbskt, str_hub_cli_p strh_cli,
 	if (NULL == shbskt || NULL == strh_cli || NULL == hub_name ||
 	    0 == hub_name_size || NULL == src_conn_params)
 		return (EINVAL);
-	cli_data = zalloc(sizeof(str_hub_cli_attach_cb_data_t) + hub_name_size + sizeof(void*));
+	cli_data = calloc(1, sizeof(str_hub_cli_attach_cb_data_t) + hub_name_size + sizeof(void*));
 	if (NULL == cli_data)
 		return (ENOMEM);
 	cli_data->shbskt = shbskt;
@@ -806,7 +806,7 @@ str_hub_send_to_clients(str_hub_p str_hub) {
 		transfered_size = 0;
 		/* Send HTTP headers if needed. */
 		if (0 == (STR_HUB_CLI_STATE_F_HTTP_HDRS_SENDED & strh_cli->flags)) {
-			mem_bzero(&mhdr, sizeof(mhdr));
+			memset(&mhdr, 0x00, sizeof(mhdr));
 			mhdr.msg_iov = (struct iovec*)iov;
 			mhdr.msg_iovlen = 3;
 			iov[0].iov_base = MK_RW_PTR("HTTP/1.1 200 OK\r\n");

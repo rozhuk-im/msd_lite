@@ -1,9 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CodeLite_Project Name="msd_lite" InternalType="" Version="11000">
-  <VirtualDirectory Name="workflows">
-    <File Name=".github/workflows/build-ubuntu-latest.yml"/>
-    <File Name=".github/workflows/build-macos-latest.yml"/>
-  </VirtualDirectory>
   <Plugins>
     <Plugin Name="CppCheck"/>
     <Plugin Name="CMakePlugin">
@@ -28,6 +24,10 @@
  }]]]>
     </Plugin>
   </Plugins>
+  <VirtualDirectory Name="workflows">
+    <File Name=".github/workflows/build-ubuntu-latest.yml"/>
+    <File Name=".github/workflows/build-macos-latest.yml"/>
+  </VirtualDirectory>
   <VirtualDirectory Name="conf">
     <File Name="conf/msd_lite.conf"/>
   </VirtualDirectory>
@@ -114,7 +114,7 @@
   <Dependencies Name="Release"/>
   <Settings Type="Executable">
     <GlobalSettings>
-      <Compiler Options="" C_Options="-fsanitize=safe-stack;-D_FORTIFY_SOURCE=2;-fstack-protector;-fPIE;-fomit-frame-pointer;-DTHREAD_POOL_SETTINGS_XML;-DHTTP_SRV_XML_CONFIG;-DSOCKET_XML_CONFIG;-DMPEG2TS_XML_CONFIG;-DHAVE_PIPE2;-DHAVE_ACCEPT4;-DHAVE_MEMRCHR;-DHAVE_MEMMEM;-DHAVE_REALLOCARRAY;-DHAVE_MEMSET_S;-DHAVE_EXPLICIT_BZERO;-DHAVE_STRLCPY" Assembler="">
+      <Compiler Options="" C_Options="-fsanitize=safe-stack;-D_FORTIFY_SOURCE=2;-fstack-protector;-fPIE;-fomit-frame-pointer;-DTHREAD_POOL_SETTINGS_XML;-DHTTP_SRV_XML_CONFIG;-DSOCKET_XML_CONFIG;-DMPEG2TS_XML_CONFIG;-DHAVE_PIPE2;-DHAVE_ACCEPT4;-DHAVE_MEMRCHR;-DHAVE_MEMMEM;-DHAVE_REALLOCARRAY;-DHAVE_MEMSET_S;-DHAVE_EXPLICIT_BZERO;-DHAVE_STRLCPY;-DHAVE_KQUEUEX;-DHAVE_TIMINGSAFE_BCMP" Assembler="">
         <IncludePath Value="$(IntermediateDirectory)"/>
         <IncludePath Value="../"/>
         <IncludePath Value="../src"/>

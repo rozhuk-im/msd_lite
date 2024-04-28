@@ -283,7 +283,7 @@ main(int argc, char *argv[]) {
 	cmd_line_data_t cmd_line_data;
 
 
-	mem_bzero(&g_data, sizeof(g_data));
+	memset(&g_data, 0x00, sizeof(g_data));
 	if (0 != cmd_line_parse(argc, argv, &cmd_line_data)) {
 		cmd_line_usage(PACKAGE_DESCRIPTION, PACKAGE_VERSION,
 		    "Rozhuk Ivan <rozhuk.im@gmail.com>",
