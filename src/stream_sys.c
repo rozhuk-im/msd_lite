@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2024 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2012-2025 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -292,7 +292,7 @@ str_hubs_bckt_destroy_msg_cb(tpt_p tpt, void *udata) {
 	size_t thread_num;
 
 	//SYSLOGD_EX(LOG_DEBUG, "...");
-	thread_num = tp_thread_get_num(tpt);
+	thread_num = tpt_get_num(tpt);
 
 	TAILQ_FOREACH_SAFE(str_hub, &shbskt->thr_data[thread_num].hub_head, next,
 	    str_hub_temp) {
@@ -334,7 +334,7 @@ str_hubs_bckt_enum_msg_cb(tpt_p tpt, void *udata) {
 	size_t thread_num;
 
 	//SYSLOGD_EX(LOG_DEBUG, "...");
-	thread_num = tp_thread_get_num(tpt);
+	thread_num = tpt_get_num(tpt);
 
 	TAILQ_FOREACH_SAFE(str_hub, &shbskt->thr_data[thread_num].hub_head, next,
 	    str_hub_temp) {
@@ -434,7 +434,7 @@ str_hubs_bckt_timer_msg_cb(tpt_p tpt, void *udata) {
 	size_t thread_num;
 
 	//SYSLOGD_EX(LOG_DEBUG, "...");
-	thread_num = tp_thread_get_num(tpt);
+	thread_num = tpt_get_num(tpt);
 	memset(&stat, 0x00, sizeof(str_hubs_stat_t));
 
 	/* Enum all Stream Hubs associated with this thread. */
@@ -525,7 +525,7 @@ str_hub_create_int(str_hubs_bckt_p shbskt, tpt_p tpt, uint8_t *name, size_t name
 		goto err_out;
 	}
 
-	TAILQ_INSERT_HEAD(&shbskt->thr_data[tp_thread_get_num(tpt)].hub_head,
+	TAILQ_INSERT_HEAD(&shbskt->thr_data[tpt_get_num(tpt)].hub_head,
 	    str_hub, next);
 
 	syslog(LOG_INFO, "%s: Created. (fd: %zu)", str_hub->name, skt);
@@ -554,7 +554,7 @@ str_hub_destroy_int(str_hub_p str_hub) {
 	tp_task_destroy(str_hub->tptask);
 
 	if (TAILQ_PREV_PTR(str_hub, next)) {
-		TAILQ_REMOVE(&str_hub->shbskt->thr_data[tp_thread_get_num(str_hub->tpt)].hub_head,
+		TAILQ_REMOVE(&str_hub->shbskt->thr_data[tpt_get_num(str_hub->tpt)].hub_head,
 		    str_hub, next);
 	}
 	/* Destroy all connected clients. */
@@ -679,7 +679,7 @@ str_hub_cli_attach_msg_cb(tpt_p tpt, void *udata) {
 
 	SYSLOGD_EX(LOG_DEBUG, "...");
 
-	thread_num = tp_thread_get_num(tpt);
+	thread_num = tpt_get_num(tpt);
 	TAILQ_FOREACH_SAFE(str_hub, &cli_data->shbskt->thr_data[thread_num].hub_head,
 	    next, str_hub_temp) {
 		if (str_hub->name_size != cli_data->hub_name_size)

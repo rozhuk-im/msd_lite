@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2012-2024 Rozhuk Ivan <rozhuk.im@gmail.com>
+ * Copyright (c) 2012-2025 Rozhuk Ivan <rozhuk.im@gmail.com>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -106,7 +106,7 @@ gen_hub_stat_text_entry_enum_cb(tpt_p tpt, str_hub_p str_hub, void *udata) {
 	    "\r\n"
 	    "Stream hub: %s		[thread: %zu @ cpu %i, clients: %zu, dropped clients: %"PRIu64"]\r\n",
 	    str_hub->name,
-	    tp_thread_get_num(tpt), tp_thread_get_cpu_id(tpt),
+	    tpt_get_num(tpt), tpt_get_cpu_id(tpt),
 	    str_hub->cli_count, str_hub->dropped_count);
 	/* Sources. */
 	IO_BUF_COPYIN_CSTR(buf, "  Source: multicast");
@@ -256,7 +256,7 @@ gen_stat_text(const char *package_name, const char *package_version,
 		    "Rate out: %"PRIu64" mbps\r\n"
 		    "Total rate: %"PRIu64" mbps\r\n"
 		    "\r\n",
-		    i, tp_thread_get_cpu_id(tp_thread_get(tp, i)),
+		    i, tpt_get_cpu_id(tp_thread_get(tp, i)),
 		    stat->str_hub_count,
 		     stat->cli_count,
 		    ( stat->baud_rate_in / (1024 * 1024)),
