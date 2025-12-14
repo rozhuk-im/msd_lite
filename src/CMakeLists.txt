@@ -1,6 +1,7 @@
 
 set(MSD_LITE_BIN	msd_lite.c
 			msd_lite_stat_text.c
+			msd_lite_stat_json.c
 			stream_sys.c
 			liblcb/src/net/socket.c
 			liblcb/src/net/socket_address.c

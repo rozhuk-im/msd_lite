@@ -71,6 +71,7 @@
 #include "utils/cmd_line_daemon.h"
 #include "utils/sys_res_limits_xml.h"
 #include "msd_lite_stat_text.h"
+#include "msd_lite_stat_json.h"
 
 
 
@@ -97,6 +98,9 @@ struct prog_settings {
 	str_src_conn_params_t	src_conn_params; /* Stream hub source connection params. */
 
 	uintptr_t	log_fd;		// log file descriptor
+
+	uint8_t		*admin_auth_basic; /* Base64 encoded "user:pass" */
+	size_t		admin_auth_basic_size;
 };
 static struct prog_settings g_data;
 
@@ -272,6 +276,30 @@ msd_src_conn_profile_load(const uint8_t *data, size_t data_size, void *conn) {
 	return (0);
 }
 
+static void
+base64_encode(const uint8_t *src, size_t len, uint8_t *dst) {
+	static const char b64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+	while (len >= 3) {
+		*dst++ = b64[src[0] >> 2];
+		*dst++ = b64[((src[0] & 0x03) << 4) | (src[1] >> 4)];
+		*dst++ = b64[((src[1] & 0x0F) << 2) | (src[2] >> 6)];
+		*dst++ = b64[src[2] & 0x3F];
+		src += 3; len -= 3;
+	}
+	if (len > 0) {
+		*dst++ = b64[src[0] >> 2];
+		if (len == 1) {
+			*dst++ = b64[(src[0] & 0x03) << 4];
+			*dst++ = '=';
+		} else {
+			*dst++ = b64[((src[0] & 0x03) << 4) | (src[1] >> 4)];
+			*dst++ = b64[(src[1] & 0x0F) << 2];
+		}
+		*dst++ = '=';
+	}
+	*dst = 0;
+}
+
 
 
 int
@@ -396,6 +424,36 @@ main(int argc, char *argv[]) {
 		msd_src_profile_load(data, data_size, &g_data.src_params);
 		msd_src_conn_profile_load(data, data_size, &g_data.src_conn_params);
 	}
+
+	/* Admin Auth Settings */
+	{
+		const uint8_t *adm_user = NULL, *adm_pass = NULL;
+		size_t adm_user_len = 0, adm_pass_len = 0;
+		
+		MSD_CFG_GET_VAL_DATA(NULL, &adm_user, &adm_user_len, "admin", "user", NULL);
+		MSD_CFG_GET_VAL_DATA(NULL, &adm_pass, &adm_pass_len, "admin", "password", NULL);
+		
+		if (adm_user && adm_pass && adm_user_len > 0 && adm_pass_len > 0) {
+			size_t up_len = adm_user_len + 1 + adm_pass_len;
+			uint8_t *up_buf = malloc(up_len + 1);
+			if (up_buf) {
+				memcpy(up_buf, adm_user, adm_user_len);
+				up_buf[adm_user_len] = ':';
+				memcpy(up_buf + adm_user_len + 1, adm_pass, adm_pass_len);
+				up_buf[up_len] = 0;
+				
+				size_t b64_len = ((up_len + 2) / 3) * 4;
+				g_data.admin_auth_basic = malloc(b64_len + 1);
+				if (g_data.admin_auth_basic) {
+					base64_encode(up_buf, up_len, g_data.admin_auth_basic);
+					g_data.admin_auth_basic_size = b64_len;
+					syslog(LOG_NOTICE, "Admin Basic Auth enabled.");
+				}
+				free(up_buf);
+			}
+		}
+	}
+
 	error = str_hubs_bckt_create(tp, PACKAGE_NAME"/"PACKAGE_VERSION, &g_data.hub_params,
 	    &g_data.src_params, &g_data.shbskt);
 	if (0 != error) {
@@ -600,6 +658,7 @@ msd_http_srv_on_req_rcv_cb(http_srv_cli_p cli, void *udata __unused,
 	str_src_conn_params_t src_conn_params;
 	static const char *cttype = 	"Content-Type: text/plain\r\n"
 					"Pragma: no-cache";
+	static const char *auth_fail_hdrs = "WWW-Authenticate: Basic realm=\"MSD Lite Admin\"\r\n";
 
 	SYSLOGD_EX(LOG_DEBUG, "...");
 
@@ -641,6 +700,64 @@ msd_http_srv_on_req_rcv_cb(http_srv_cli_p cli, void *udata __unused,
 		}
 		/* Will send reply later... */
 		return (HTTP_SRV_CB_NONE);
+	}
+
+	/* JSON Statistic request. */
+	if (HTTP_REQ_METHOD_GET == req->line.method_code &&
+	    0 == mem_cmpin_cstr("/api/stats", req->line.abs_path, req->line.abs_path_size)) {
+		
+		/* Auth Check */
+		if (g_data.admin_auth_basic) {
+			const uint8_t *val;
+			size_t val_len;
+			if (0 != http_hdr_val_get(req->hdr, req->hdr_size, (const uint8_t*)"Authorization", 13, &val, &val_len) ||
+			    val_len < 6 || 
+			    0 != memcmp(val, "Basic ", 6) ||
+			    val_len - 6 != g_data.admin_auth_basic_size ||
+			    0 != memcmp(val + 6, g_data.admin_auth_basic, g_data.admin_auth_basic_size)) {
+				resp->status_code = 401;
+				resp->hdrs_count = 1;
+				resp->hdrs[0].iov_base = MK_RW_PTR(auth_fail_hdrs);
+				resp->hdrs[0].iov_len = 46;
+				return (HTTP_SRV_CB_CONTINUE);
+			}
+		}
+
+		error = gen_hub_stat_json_send_async(g_data.shbskt, cli);
+		if (0 != error) {
+			resp->status_code = 500;
+			return (HTTP_SRV_CB_CONTINUE);
+		}
+		/* Will send reply later... */
+		return (HTTP_SRV_CB_NONE);
+	}
+
+	/* Admin page request. */
+	if (HTTP_REQ_METHOD_GET == req->line.method_code &&
+	    0 == mem_cmpin_cstr("/admin", req->line.abs_path, req->line.abs_path_size)) {
+		
+		/* Auth Check */
+		if (g_data.admin_auth_basic) {
+			const uint8_t *val;
+			size_t val_len;
+			if (0 != http_hdr_val_get(req->hdr, req->hdr_size, (const uint8_t*)"Authorization", 13, &val, &val_len) ||
+			    val_len < 6 || 
+			    0 != memcmp(val, "Basic ", 6) ||
+			    val_len - 6 != g_data.admin_auth_basic_size ||
+			    0 != memcmp(val + 6, g_data.admin_auth_basic, g_data.admin_auth_basic_size)) {
+				resp->status_code = 401;
+				resp->hdrs_count = 1;
+				resp->hdrs[0].iov_base = MK_RW_PTR(auth_fail_hdrs);
+				resp->hdrs[0].iov_len = 46;
+				return (HTTP_SRV_CB_CONTINUE);
+			}
+		}
+
+		error = gen_admin_page(cli);
+		if (0 != error) {
+			resp->status_code = 500;
+		}
+		return (HTTP_SRV_CB_CONTINUE);
 	}
 
 	if (12 < req->line.abs_path_size &&
