@@ -695,7 +695,6 @@ str_hub_cli_attach_msg_cb(tpt_p tpt, void *udata) {
 		    &cli_data->src_conn_params, &str_hub);
 		if (0 != error) {
 			str_hub_cli_destroy(NULL, cli_data->strh_cli);
-			close((int)cli_data->strh_cli->skt);
 			free(cli_data);
 			SYSLOG_ERR(LOG_ERR, error, "str_hub_create().");
 			return;
