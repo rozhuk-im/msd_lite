@@ -99,6 +99,8 @@ struct prog_settings {
 	uintptr_t	log_fd;		// log file descriptor
 };
 static struct prog_settings g_data;
+static tp_p g_tp = NULL;
+
 
 int		msd_http_cust_hdrs_load(const uint8_t *buf, size_t buf_size,
 		    uint8_t **hdrs, size_t *hdrs_size_ret);
@@ -273,13 +275,22 @@ msd_src_conn_profile_load(const uint8_t *data, size_t data_size, void *conn) {
 }
 
 
+static void
+tp_signal_handler(int sig) {
+
+	switch (sig) {
+	case SIGINT:
+	case SIGTERM:
+		tp_shutdown(g_tp);
+		break;
+	}
+}
 
 int
 main(int argc, char *argv[]) {
 	int error = 0;
 	uint8_t *cfg_file_buf = NULL;
 	size_t tm, cfg_file_buf_size = 0;
-	tp_p tp;
 	cmd_line_data_t cmd_line_data;
 
 
@@ -354,14 +365,14 @@ main(int argc, char *argv[]) {
 	memset(&tp_prms, 0x00, sizeof(tp_prms));
 	strlcpy(tp_prms.name, "Events pool", sizeof(tp_prms.name));
 	tp_prms.flags = TP_P_F_CLOEXEC;
-	error = tp_create(&tp_s, &tp_prms, &tp);
+	error = tp_create(&tp_s, &tp_prms, &g_tp);
 	if (0 != error) {
 		SYSLOG_ERR(LOG_CRIT, error, "tp_create().");
 		goto err_out;
 	}
 
 	/* Create and start threads. */
-	error = tp_threads_create(tp);
+	error = tp_threads_create(g_tp);
 	if (0 != error) {
 		SYSLOG_ERR(LOG_CRIT, error, "tp_threads_create().");
 		goto err_out;
@@ -381,7 +392,7 @@ main(int argc, char *argv[]) {
 	ccb.on_rep_snd = NULL;
 	ccb.on_destroy = NULL;
 
-	error = http_srv_xml_load_start(data, data_size, tp,
+	error = http_srv_xml_load_start(data, data_size, g_tp,
 	    NULL, &ccb, &http_s, &g_data,
 	    &g_data.http_srv);
  	if (0 != error) {
@@ -408,7 +419,7 @@ main(int argc, char *argv[]) {
 		msd_src_profile_load(data, data_size, &g_data.src_params);
 		msd_src_conn_profile_load(data, data_size, &g_data.src_conn_params);
 	}
-	error = str_hubs_bckt_create(tp, PACKAGE_NAME"/"PACKAGE_VERSION, &g_data.hub_params,
+	error = str_hubs_bckt_create(g_tp, PACKAGE_NAME"/"PACKAGE_VERSION, &g_data.hub_params,
 	    &g_data.src_params, &g_data.shbskt);
 	if (0 != error) {
 		SYSLOG_ERR(LOG_CRIT, error, "str_hubs_bckt_create().");
@@ -428,14 +439,13 @@ main(int argc, char *argv[]) {
 	}
 	info_sysres(&g_data.sysres, NULL, 0, NULL);
 
-	tp_signal_handler_add_tp(tp);
 	signal_install(tp_signal_handler);
 
 	write_pid(cmd_line_data.pid_file_name); /* Store pid to file. */
 	set_user_and_group(cmd_line_data.pw_uid, cmd_line_data.pw_gid); /* Drop rights. */
 
 	/* Receive and process packets. */
-	error = tp_shutdown_wait(tp);
+	error = tp_shutdown_wait(g_tp);
 	if (0 != error) {
 		SYSLOG_ERR(LOG_ERR, error, "tp_shutdown_wait().");
 	}
@@ -448,7 +458,7 @@ main(int argc, char *argv[]) {
 		unlink(cmd_line_data.pid_file_name); // Remove pid file
 	}
 
-	tp_destroy(tp);
+	tp_destroy(g_tp);
 	syslog(LOG_NOTICE, "Exiting.");
 	closelog();
 
